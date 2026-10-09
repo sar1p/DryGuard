@@ -22,30 +22,30 @@ void require(bool ok, const char* message) {
   if (!ok) throw std::runtime_error(message);
 }
 
-class ControllerSink : public jemuran::CommandSink {
+class ControllerSink : public dryguard::CommandSink {
  public:
-  explicit ControllerSink(jemuran::Controller& controller) : calls(0), controller_(controller) {}
-  void handleCommand(jemuran::CommandType type, int value) override {
+  explicit ControllerSink(dryguard::Controller& controller) : calls(0), controller_(controller) {}
+  void handleCommand(dryguard::CommandType type, int value) override {
     ++calls;
     const int32_t position = controller_.state().position;
     switch (type) {
-      case jemuran::CommandType::Power: controller_.setEnabled(value == 1); break;
-      case jemuran::CommandType::Automatic: controller_.setAutomatic(value == 1, position); break;
-      case jemuran::CommandType::Manual: controller_.setManual(value == 1, position); break;
-      case jemuran::CommandType::Inside: if (value == 1) controller_.moveInside(); break;
-      case jemuran::CommandType::Outside: if (value == 1) controller_.moveOutside(); break;
+      case dryguard::CommandType::Power: controller_.setEnabled(value == 1); break;
+      case dryguard::CommandType::Automatic: controller_.setAutomatic(value == 1, position); break;
+      case dryguard::CommandType::Manual: controller_.setManual(value == 1, position); break;
+      case dryguard::CommandType::Inside: if (value == 1) controller_.moveInside(); break;
+      case dryguard::CommandType::Outside: if (value == 1) controller_.moveOutside(); break;
     }
   }
   int calls;
  private:
-  jemuran::Controller& controller_;
+  dryguard::Controller& controller_;
 };
 
 struct Fixture {
-  jemuran::Controller controller;
+  dryguard::Controller controller;
   ControllerSink sink;
-  jemuran::BlynkGateway gateway;
-  Fixture() : controller(jemuran::config::kSettings), sink(controller) {
+  dryguard::BlynkGateway gateway;
+  Fixture() : controller(dryguard::config::kSettings), sink(controller) {
     fake::clockMs = 0;
     WiFi.statusValue = WL_CONNECTED;
     Blynk.connectedState = true;
@@ -53,8 +53,8 @@ struct Fixture {
     gateway.begin(sink);
     BlynkWidgetConnected();
   }
-  jemuran::DashboardState state() const {
-    const jemuran::SavedState& control = controller.state();
+  dryguard::DashboardState state() const {
+    const dryguard::SavedState& control = controller.state();
     return {control, {3500, 2000, false, false, true},
             {control.position, control.target, controller.motionRequest().move, 0}};
   }

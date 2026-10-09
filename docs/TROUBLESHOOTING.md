@@ -24,7 +24,7 @@ The reset reason helps with investigation, but it is not a voltage measurement o
 
 ## 5 V Stepper Motor and ULN2003
 
-Pin configuration and initial speeds follow the legacy project. If the motor misses steps under load, try a lower speed/acceleration in `HardwareConfig.h`, check for mechanical binding, and compare the estimated position with the physical position. Software step counting does not detect a stall.
+Pin configuration and initial speeds follow the current project settings. If the motor misses steps under load, try a lower speed/acceleration in `firmware/dryguard/src/config/HardwareConfig.h`, check for mechanical binding, and compare the estimated position with the physical position. Software step counting does not detect a stall.
 
 `kMotorMaxSpeed` is the configured speed limit. Actual speed also depends on how often `run()` is called and on task scheduling; measure travel time on the device before assuming that this speed is reached.
 
@@ -32,13 +32,13 @@ Power the motor/driver from a 5 V supply as specified; do not power the motor fr
 
 ## Dashboard Does Not Connect
 
-- Check that `src/Secrets.h` exists and that the token/SSID are filled in. The blank example intentionally disables networking.
+- Check that `firmware/dryguard/src/Secrets.h` exists and that the token/SSID are filled in. The blank example intentionally disables networking.
 - Check the template ID, device token, virtual pins, and Wi-Fi network against the Blynk configuration.
-- Confirm that Serial shows a Wi-Fi connection followed by a Blynk connection; Blynk retries every five seconds with a bounded timeout.
+- Check the Wi-Fi and Blynk connection status. Blynk retries every five seconds using a `connect(250)` budget; connection work may still block the application task.
 - After reconnect, device state is sent again. A device power state of OFF is not replaced by a cloud switch that was previously ON.
 
 ## Position or Resume Does Not Match
 
 A moving checkpoint is not written at every step. A sudden power loss can discard changes since the last checkpoint; mechanical shifts while powered off and missed steps are also undetected. Reconcile the physical position, then adjust calibration or add a homing mechanism in a future development change.
 
-At every boot/restart, the firmware waits for V0 ON; read the `[STATE]` estimate and compare it with the physical position first. The legacy namespace is retained for traceability, but an older firmware rollback may read its own checkpoint, which no longer tracks movement under the new firmware.
+At every boot/restart, the firmware waits for V0 ON; read the `[STATE]` estimate and compare it with the physical position first. If you roll back to older firmware, it may read a saved checkpoint that has not tracked movement under the current firmware. Verify the physical position before enabling motion.

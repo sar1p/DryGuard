@@ -10,11 +10,13 @@ The runner requires GCC or Clang on `PATH`. If the compiler is in another locati
 
 The 20 core tests cover OFF at startup/restart, automatic weather response, hysteresis including recovery after an invalid ADC reading, mode changes, manual override, command rejection while OFF, pause/resume after enabling, the full `4000` target, position-hold checkpoints, corrupted records, and debounce across `millis()` rollover.
 
-The 5 gateway tests compile the same `BlynkGateway.cpp` used by the firmware together with the original controller. Arduino, Wi-Fi, and Blynk API stubs record published values to check rejected switch corrections while OFF, send intervals, input callbacks, and refresh after reconnect. Source copies and dummy headers are created only in `build/native/gateway/`; the runner does not read or overwrite your private `Secrets.h`.
+The 5 gateway tests compile the firmware's `BlynkGateway.cpp` together with its controller. Arduino, Wi-Fi, and Blynk API stubs record published values to check rejected switch corrections while OFF, send intervals, input callbacks, and refresh after reconnect. Source copies and dummy headers are created only in `build/native/gateway/`; the runner does not read or overwrite your private `Secrets.h`.
+
+The 8 storage tests compile the firmware's `StateStore.cpp` against Arduino and Preferences test doubles. They cover canonical checkpoint precedence, import from earlier read-only storage aliases, position and motion intent retention while OFF, corrupt-record handling that prevents stale fallback, initialization failure, and write retries. Together, the three suites contain 33 tests.
 
 GitHub Actions runs two checks:
 
-1. **Native C++ tests**: compile with C++11, treat warnings as errors, and run the 20 core tests and 5 gateway tests.
+1. **Native C++ tests**: compile with C++11, treat warnings as errors, and run the core, gateway, and StateStore suites.
 2. **ESP32 firmware build**: build with PlatformIO using pinned dependencies, then check configurations with networking disabled and with dummy network settings in a local header.
 
 On Windows, after setting up PlatformIO, `.\.venv\Scripts\python.exe tools/check_configured_build.py` checks the network-enabled variant with dummy credentials. The tool refuses to overwrite an existing `Secrets.h` and removes the dummy header it created after the build. The resulting binary uses dummy data; rebuild with your device credentials before uploading.
