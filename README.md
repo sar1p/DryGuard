@@ -35,7 +35,7 @@ firmware/dryguard/
     app/                   # application orchestration
     motor/                 # single task that owns AccelStepper
     sensors/               # ADC readings and filtering
-    storage/               # Preferences/NVS and migration
+    storage/               # Preferences/NVS checkpoint storage
     iot/                   # Wi-Fi, Blynk, dashboard
     diagnostics/           # reset reason and heap status
 tests/                     # core, Blynk gateway, and storage regression tests
@@ -50,7 +50,7 @@ platformio.ini             # pinned platform/library versions
 1. Copy `firmware/dryguard/src/Secrets.example.h` to `Secrets.h` in the same folder, then fill in the Blynk template, token, SSID, and Wi-Fi password. `Secrets.h` is ignored by Git.
 2. Prepare the dashboard according to the [Blynk virtual pin table](docs/SETUP.md#blynk-dashboard).
 3. Build with PlatformIO or open `firmware/dryguard/dryguard.ino` in the Arduino IDE. There is no need to change the `.cpp` file extension.
-4. On **every boot/restart**, the system starts **OFF** while retaining the saved target. Match the physical position to the estimate shown in Serial Monitor before turning on V0. V0 ON immediately activates the saved mode; on the first boot, the default mode is automatic.
+4. The system starts **OFF** on every boot/restart. A valid current checkpoint retains the saved target, but position is only an estimate. Before V0 ON, compare the estimate with the physical position. If no valid current checkpoint exists, including an upgrade with only an older checkpoint, the estimate starts at `0`; align the rack with the retracted position before enabling V0. On first boot, the default mode is automatic.
 5. After V0 ON, select automatic mode through V1, or manual mode through V2/V3/V4. Mode commands issued while OFF are ignored, and the dashboard switch is restored to the device status.
 
 Full guides: [setup and build](docs/SETUP.md), [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md), and [restart troubleshooting](docs/TROUBLESHOOTING.md).

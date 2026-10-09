@@ -47,6 +47,12 @@ The `esp32dev` target is for a dual-core classic ESP32. The label “ESP32D” d
 
 The `.ino` sketch is intentionally short because `setup()` and `loop()` are in `firmware/dryguard/src/main.cpp`. Keep this as the sketch folder's only `.ino` entry point.
 
+## First Boot and Firmware Upgrades
+
+The system starts OFF on every boot. It reads checkpoints only from `dryguard_v3/state`; saved data under older namespaces is ignored and not erased. If the current checkpoint is missing or invalid, including on an upgrade where only an older checkpoint exists, the position estimate starts at `0`. Align the rack with the retracted position before turning V0 ON. The firmware has no limit switch, encoder, or automatic homing to verify position.
+
+With a valid current checkpoint, the saved estimate, target, and mode are retained, but power still starts OFF. Compare the reported estimate with the physical position before enabling V0.
+
 ## Blynk Dashboard
 
 Create the following datastreams in the device template and connect each widget to its corresponding virtual pin:
@@ -62,7 +68,7 @@ Create the following datastreams in the device template and connect each widget 
 | V6 | String | Light: DARK/BRIGHT/-/READING |
 | V7 | String | Position/movement: `RETRACTED`, `EXTENDED`, `PARTIAL`, `EXTENDING >>`, `<< RETRACTING`, `SYSTEM OFF` |
 
-Device state is authoritative after reconnect. On each boot/restart, V0 is published as OFF; the saved mode and target are retained. Power ON activates the saved mode after the position is checked; if the mode is Idle, select V1 or V2/V3/V4.
+Device state is authoritative after reconnect. On each boot/restart, V0 is published as OFF. A valid current checkpoint retains the saved mode and target; if no valid current checkpoint exists, see [first boot and firmware upgrades](#first-boot-and-firmware-upgrades) before enabling V0. Power ON activates the saved mode after the position is checked; if the mode is Idle, select V1 or V2/V3/V4.
 
 On first boot, the default mode is automatic; V0 ON may immediately request movement based on the sensors. V1/V2 change the mode only while the system is ON. If a mode is selected while OFF, the firmware corrects the switch at the next dashboard interval.
 

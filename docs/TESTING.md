@@ -12,7 +12,7 @@ The 20 core tests cover OFF at startup/restart, automatic weather response, hyst
 
 The 5 gateway tests compile the firmware's `BlynkGateway.cpp` together with its controller. Arduino, Wi-Fi, and Blynk API stubs record published values to check rejected switch corrections while OFF, send intervals, input callbacks, and refresh after reconnect. Source copies and dummy headers are created only in `build/native/gateway/`; the runner does not read or overwrite your private `Secrets.h`.
 
-The 8 storage tests compile the firmware's `StateStore.cpp` against Arduino and Preferences test doubles. They cover canonical checkpoint precedence, import from earlier read-only storage aliases, position and motion intent retention while OFF, corrupt-record handling that prevents stale fallback, initialization failure, and write retries. Together, the three suites contain 33 tests.
+The 8 storage tests compile the firmware's `StateStore.cpp` against Arduino and Preferences test doubles. They cover current-format record loading with controller startup OFF, unrelated namespace isolation, corrupt checksum and wrong-length/type rejection, valid save/load round-trips, rejection of invalid state without overwriting saved data, initialization failure, and short-write retry and deduplication. The three suites contain 33 tests total: 20 core, 5 gateway, and 8 storage.
 
 GitHub Actions runs two checks:
 
@@ -29,7 +29,7 @@ Every scenario below requires physical testing; do not mark it as passed just be
 
 | Scenario | Expected result |
 |---|---|
-| First boot, clothesline retracted | Estimate is 0 and system is OFF; V0 ON followed by V1 starts automatic mode |
+| First boot or upgrade with only an older checkpoint | Estimate is 0 and system is OFF; align the rack with the retracted position before V0 ON, then select V1 for automatic mode |
 | Dry and bright | Target is extended; movement completes without a stall or reset |
 | Rain while extending | Target changes to retracted; the mechanism does not continue past its mechanical limit |
 | Dark | Automatic mode targets retracted |
