@@ -1,44 +1,44 @@
-# Menelusuri restart dan gangguan gerak
+# Troubleshooting Resets and Movement Issues
 
-## Ambil bukti dari Serial Monitor
+## Collect Evidence from the Serial Monitor
 
-Buka Serial Monitor pada **115200 baud** sebelum mengulang kondisi yang menimbulkan restart. Firmware baru menampilkan format berikut; ini contoh format, bukan hasil pengukuran alat:
+Open the Serial Monitor at **115200 baud** before reproducing the condition that causes a restart. The new firmware prints the format below; this is an example format, not a measurement from a device:
 
 ```text
-[BOOT] Jemuran modular | reset=<ALASAN> (<KODE>) | SDK=<VERSI>
+[BOOT] DryGuard firmware | reset=<REASON> (<CODE>) | SDK=<VERSION>
 [DIAG] heap_free=<BYTES> bytes | heap_min=<BYTES> bytes
-[STATE] estimate=<LANGKAH> target=<LANGKAH> power=<0/1> mode=<MODE>
+[STATE] estimate=<STEPS> target=<STEPS> power=<0/1> mode=<MODE>
 ```
 
-Simpan log sebelum restart, termasuk pesan panic/backtrace bila ada, dan baris boot sesudahnya. Alasan reset dilaporkan melalui `esp_reset_reason()` menurut [dokumentasi Espressif](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/misc_system_api.html#reset-reason).
+Save the log from before the restart, including any panic/backtrace messages, and the boot lines that follow it. The reset reason is reported through `esp_reset_reason()` according to the [Espressif documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/misc_system_api.html#reset-reason).
 
-| Alasan | Arti awal dan pemeriksaan berikutnya |
+| Reason | Initial meaning and next checks |
 |---|---|
-| `BROWNOUT` | Detektor brownout melaporkan tegangan rendah; periksa suplai, kabel, ground, dan tegangan saat motor berbeban |
-| `TASK_WATCHDOG` / `INTERRUPT_WATCHDOG` | Watchdog terpicu; ambil backtrace dan periksa fungsi/task yang menahan eksekusi |
-| `PANIC` | Ambil seluruh pesan error dan backtrace; cocokkan dengan ELF dari build yang benar-benar diunggah |
-| `POWER_ON` / `EXTERNAL_RESET` | Periksa hilangnya daya, konektor, atau sinyal reset; alasan ini belum menentukan penyebab lengkap |
-| `SOFTWARE_RESET` / `UNKNOWN` | Periksa log sebelum reset; kode baru tidak menjadwalkan reboot untuk reconnect Wi-Fi |
+| `BROWNOUT` | The brownout detector reported low voltage; check the supply, cables, ground, and voltage while the motor is under load |
+| `TASK_WATCHDOG` / `INTERRUPT_WATCHDOG` | A watchdog was triggered; capture the backtrace and inspect the function/task that blocked execution |
+| `PANIC` | Capture the complete error message and backtrace; match them against the ELF from the build that was actually uploaded |
+| `POWER_ON` / `EXTERNAL_RESET` | Check for power loss, connector issues, or a reset signal; this reason alone does not identify the full cause |
+| `SOFTWARE_RESET` / `UNKNOWN` | Check the log before the reset; the new code does not schedule a reboot for Wi-Fi reconnects |
 
-Log alasan reset membantu penyelidikan, tetapi bukan pengukuran tegangan atau bukti tunggal bahwa komponen tertentu rusak.
+The reset reason helps with investigation, but it is not a voltage measurement or standalone proof that a particular component is faulty.
 
-## Motor stepper 5 V dan ULN2003
+## 5 V Stepper Motor and ULN2003
 
-Konfigurasi pin serta kecepatan awal mengikuti proyek lama. Bila motor kehilangan langkah ketika diberi beban, uji kecepatan/percepatan lebih rendah pada `HardwareConfig.h`, periksa hambatan mekanik, dan cocokkan estimasi posisi terhadap posisi fisik. Pencacahan langkah software tidak mendeteksi stall.
+Pin configuration and initial speeds follow the legacy project. If the motor misses steps under load, try a lower speed/acceleration in `HardwareConfig.h`, check for mechanical binding, and compare the estimated position with the physical position. Software step counting does not detect a stall.
 
-`kMotorMaxSpeed` adalah batas kecepatan yang dikonfigurasi. Kecepatan aktual juga bergantung pada frekuensi pemanggilan `run()` dan penjadwalan task; ukur waktu perjalanan pada perangkat sebelum menganggap nilai itu tercapai.
+`kMotorMaxSpeed` is the configured speed limit. Actual speed also depends on how often `run()` is called and on task scheduling; measure travel time on the device before assuming that this speed is reached.
 
-Pastikan motor/driver memperoleh suplai 5 V sesuai spesifikasinya; motor tidak disuplai dari GPIO ESP32. ESP32 dan driver memerlukan ground bersama. Bandingkan kondisi tanpa gerak motor, gerak tanpa beban, dan beban penggunaan, lalu ukur tegangan saat gejala muncul. Mengubah kode tidak dapat memperbaiki suplai yang turun atau mekanisme yang macet.
+Power the motor/driver from a 5 V supply as specified; do not power the motor from an ESP32 GPIO. The ESP32 and driver need a common ground. Compare operation with the motor stopped, moving without a load, and carrying a normal-use load, then measure the voltage when the symptom occurs. Code changes cannot fix a sagging supply or a jammed mechanism.
 
-## Dashboard tidak tersambung
+## Dashboard Does Not Connect
 
-- Periksa apakah `src/Secrets.h` tersedia dan token/SSID telah diisi. Contoh kosong sengaja menonaktifkan jaringan.
-- Cocokkan template ID, token perangkat, virtual pin, serta jaringan Wi-Fi dengan konfigurasi Blynk.
-- Pastikan Serial menampilkan koneksi Wi-Fi lalu Blynk; retry Blynk berjalan setiap lima detik dengan timeout terbatas.
-- Sesudah reconnect, state perangkat dikirim ulang. State power OFF tidak digantikan oleh switch cloud yang sebelumnya ON.
+- Check that `src/Secrets.h` exists and that the token/SSID are filled in. The blank example intentionally disables networking.
+- Check the template ID, device token, virtual pins, and Wi-Fi network against the Blynk configuration.
+- Confirm that Serial shows a Wi-Fi connection followed by a Blynk connection; Blynk retries every five seconds with a bounded timeout.
+- After reconnect, device state is sent again. A device power state of OFF is not replaced by a cloud switch that was previously ON.
 
-## Posisi atau resume tidak sesuai
+## Position or Resume Does Not Match
 
-Checkpoint bergerak tidak dibuat pada setiap langkah. Pemadaman mendadak dapat menghilangkan perubahan sejak checkpoint terakhir; pergeseran mekanik saat mati dan langkah terlewat juga tidak terdeteksi. Cocokkan posisi secara fisik, lalu perbaiki kalibrasi atau tambahkan mekanisme homing pada pengembangan berikutnya.
+A moving checkpoint is not written at every step. A sudden power loss can discard changes since the last checkpoint; mechanical shifts while powered off and missed steps are also undetected. Reconcile the physical position, then adjust calibration or add a homing mechanism in a future development change.
 
-Pada setiap boot/restart, firmware menunggu V0 ON; baca estimasi `[STATE]` dan cocokkan dengan posisi fisik terlebih dahulu. Namespace lama tetap tersimpan agar dapat ditelusuri, tetapi rollback firmware lama mungkin membaca checkpoint lamanya sendiri yang sudah tidak mengikuti gerak pada firmware baru.
+At every boot/restart, the firmware waits for V0 ON; read the `[STATE]` estimate and compare it with the physical position first. The legacy namespace is retained for traceability, but an older firmware rollback may read its own checkpoint, which no longer tracks movement under the new firmware.

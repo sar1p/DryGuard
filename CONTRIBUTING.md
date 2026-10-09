@@ -1,23 +1,23 @@
-# Alur perubahan kode
+# Code change workflow
 
-Buat perubahan pada branch sendiri, lalu kirim pull request agar kode dan hasil tes dapat diperiksa bersama:
+Make changes on your own branch, then open a pull request so the code and test results can be reviewed together:
 
 ```powershell
 git switch main
 git pull --ff-only
-git switch -c feat/nama-perubahan
+git switch -c feat/change-name
 git status
 ```
 
-Setelah mengedit, jalankan tes core dan build firmware sesuai `docs/TESTING.md`. Stage file yang memang berubah, cek diff, lalu commit dan push:
+After editing, run the core and gateway tests and build the firmware according to `docs/TESTING.md`. Stage the files that changed, review the diff, then commit and push:
 
 ```powershell
-git add firmware tests docs
+git add -A
 git diff --cached
 git commit -m "Describe the concrete change"
-git push -u origin feat/nama-perubahan
+git push -u origin feat/change-name
 ```
 
-Jelaskan masalah, perubahan perilaku, dan hasil pengujian pada pull request. Bedakan tes software dari tes fisik ESP32. Tunggu hasil GitHub Actions sebelum merge.
+Describe the problem, behavior changes, and test results in the pull request. Distinguish software tests from physical ESP32 tests. The protected `main` branch requires a pull request, up-to-date passing results from `Native C++ tests` and `ESP32 firmware build`, and resolved review conversations before merging. No external reviewer approval is required. Force pushes and branch deletion are blocked, including for the repository owner.
 
-`Secrets.h`, `.pio`, `.venv`, hasil build, dan log lokal diabaikan Git. Simpan data jaringan hanya dalam konfigurasi lokal. Hindari mengubah isi `legacy/` saat memperbaiki firmware aktif; arsip tersebut menjadi pembanding terhadap versi sebelumnya.
+`Secrets.h`, `.pio`, `.venv`, build outputs, and local logs are ignored by Git. Keep network credentials only in local configuration. Avoid editing `legacy/` when fixing the active firmware; the archive is a reference for comparison with previous versions.

@@ -1,53 +1,53 @@
-# Arsitektur dan aliran data
+# Architecture and data flow
 
-## Pemilik masing-masing komponen
+## Component ownership
 
-| Modul | Tanggung jawab | Pemilik saat runtime |
+| Module | Responsibility | Runtime owner |
 |---|---|---|
-| `app/Application` | Orkestrasi, penerimaan perintah, penjadwalan checkpoint | task aplikasi, core 0 |
-| `core/Controller` | Power, mode, tujuan motor, pause/resume | task aplikasi |
-| `core/SensorPolicy` | Ambang dan hysteresis sensor | task aplikasi |
-| `core/StateCodec` | Encode/decode, schema, checksum, validasi record | task aplikasi / tes native |
-| `motor/MotorService` | AccelStepper, pembatasan target, snapshot posisi | task motor, core 1 |
-| `sensors/SensorService` | Median lima sampel ADC, pembacaan 200 ms | task aplikasi |
-| `storage/StateStore` | Membaca/mengubah Preferences/NVS | task aplikasi |
-| `iot/BlynkGateway` | Wi-Fi, reconnect, callback Blynk, virtualWrite | task aplikasi |
-| `diagnostics/Diagnostics` | Alasan reset dan statistik heap | setup / task aplikasi |
+| `app/Application` | Coordination, commands, and checkpoint scheduling | application task, core 0 |
+| `core/Controller` | Power, mode, motor destination, and pause/resume | application task |
+| `core/SensorPolicy` | Sensor thresholds and hysteresis | application task |
+| `core/StateCodec` | Encoding, schema, checksum, and record validation | application task / native tests |
+| `motor/MotorService` | AccelStepper, target limits, and position snapshots | motor task, core 1 |
+| `sensors/SensorService` | Median of five ADC samples, sampled every 200 ms | application task |
+| `storage/StateStore` | Preferences/NVS reads and writes | application task |
+| `iot/BlynkGateway` | Wi-Fi, reconnects, Blynk callbacks, and virtualWrite | application task |
+| `diagnostics/Diagnostics` | Reset reason and heap statistics | setup / application task |
 
-Setelah inisialisasi, hanya task motor yang memanggil metode objek AccelStepper. Aplikasi mengirim `MotionRequest` melalui queue satu slot: pesan terbaru berisi seluruh tujuan yang berlaku, sehingga perintah lama tidak menumpuk. Snapshot dibagikan melalui queue terpisah, tanpa mengakses objek motor dari core lain.
+After initialization, only the motor task calls AccelStepper methods. The application sends `MotionRequest` through a single-slot queue. The latest message contains the complete requested state, so old commands do not accumulate. A separate queue shares snapshots without accessing the motor object from another core.
 
-Queue menyimpan kondisi akhir yang diminta. Perintah yang segera digantikan sebelum diterima task motor dapat dilewati; perubahan OFF lalu ON bukan dua event yang wajib dijalankan berurutan.
+The command queue retains the latest desired state. A command replaced before the motor task receives it may be skipped; a rapid OFF-to-ON change does not guarantee two separately executed events.
 
-Setiap perintah motor membawa nomor urut. Aplikasi menunggu snapshot yang mengakui nomor tersebut sebelum membuat checkpoint perubahan perintah. Dengan demikian, Power OFF menyimpan posisi setelah task motor menerima hold, bukan posisi yang dibaca sebelum motor berhenti.
+Each motor command carries a sequence number. The application waits for a snapshot acknowledging that sequence before saving a command-change checkpoint. Power OFF therefore saves the position after the motor task applies hold, rather than a snapshot from before the motor stopped.
 
-## Power dan mode
+## Power and modes
 
-- `Automatic`: hujan **atau** gelap mengarah ke dalam; kering **dan** terang mengarah ke luar. Pembacaan sensor tidak valid mengarah ke dalam.
-- `Manual`: V3/V4 memilih tujuan secara eksplisit. Perintah manual mengabaikan aturan cuaca sampai mode automatic dipilih kembali.
-- `Idle`: tidak ada gerak yang diminta.
-- Power OFF terpisah dari mode. Mode dan tujuan yang tertunda dipertahankan, tetapi permintaan motor menjadi hold. Ketika power kembali ON dalam mode automatic, cuaca terkini dievaluasi terlebih dahulu.
-- Setiap boot mulai OFF, termasuk ketika record menyimpan power ON. Mode/tujuan tetap dipertahankan, tetapi V0 harus dinyalakan kembali setelah posisi fisik diperiksa. Tanpa feedback posisi, firmware tidak dapat membuktikan lokasi motor sesudah reset mendadak.
-- V0 mengaktifkan/menonaktifkan logika gerak; hold tidak memutus suplai driver atau otomatis melepas arus holding coil.
-- Memilih mode manual melalui V2 membuat motor hold. Mematikan mode yang aktif juga membuat hold.
+- `Automatic`: rain **or** darkness requests retraction; dry **and** bright conditions request extension. Invalid sensor readings request retraction.
+- `Manual`: V3/V4 select a destination directly. Manual commands override weather rules until automatic mode is selected again.
+- `Idle`: no movement is requested.
+- Power OFF is separate from mode. The mode and pending destination are retained, while the motor request becomes hold. Re-enabling automatic mode evaluates the current weather first.
+- Every boot starts OFF, even if a saved record contains power ON. Mode and destination are retained, but V0 must be enabled after checking the physical position. Without position feedback, the firmware cannot establish where the motor stopped during an unexpected reset.
+- V0 enables or disables motion logic. Hold does not disconnect driver power or automatically release holding-coil current.
+- Selecting manual mode through V2 requests hold. Turning off the active mode also requests hold.
 
-Hold diterapkan pada posisi aktual di task motor. Angka snapshot yang mungkin sudah terlambat beberapa langkah tidak digunakan sebagai tujuan untuk menghentikan motor.
+Hold uses the motor task's actual step count. A snapshot that may be several steps old is not used as the stopping destination.
 
-## Penyimpanan dan migrasi
+## Storage and migration
 
-Namespace baru adalah `jemuran_v3`, dengan satu key `state` berisi record 32 byte. Record menyimpan posisi, target, mode, power, dan niat gerak; versi format serta checksum divalidasi sebelum digunakan. Ini menghindari record campuran dari penulisan banyak key terpisah, tetapi ketepatan posisi tetap bergantung pada estimasi langkah dan interval checkpoint.
+The new namespace is `jemuran_v3`. Its `state` key contains a 32-byte record with position, target, mode, power, and motion intent. The schema version and checksum are checked before use. A single record avoids mixing values from separate key writes, but position accuracy still depends on step estimation and checkpoint timing.
 
-Data valid dari `jemuran_v2` atau `jemuran` dapat diimpor saat record baru belum tersedia. Flag resume Preferences milik versi eksperimen ikut diperiksa. Flag EEPROM dari versi awal tidak diimpor. Namespace lama tidak dihapus. Hasil migrasi mulai OFF karena kedua sketch lama tidak menyimpan state power secara konsisten.
+Valid data from `jemuran_v2` or `jemuran` can be imported when no new record exists. Preferences resume flags from the experimental version are checked. The original EEPROM resume flag is not imported. Older namespaces are retained. Migration starts OFF because the two older sketches did not save power state consistently.
 
-Record baru yang tidak valid menyebabkan startup OFF; data legacy tidak dipakai sebagai pengganti checkpoint baru yang korup. Pada boot pertama, estimasi awal adalah posisi dalam `0`; cocokkan kondisi mekanis sebelum menyalakan sistem.
+An invalid new record starts the system OFF; legacy data does not replace a corrupt new checkpoint. On first boot, the initial estimate is the retracted position `0`. Check the mechanism before enabling the system.
 
-Flash ditulis oleh task aplikasi saat state berubah, motor selesai, atau checkpoint bergerak memenuhi interval lima detik dan perubahan minimal 50 langkah. Record yang sama tidak ditulis ulang. Operasi flash ESP32 masih dapat memengaruhi timing sistem; pemisahan task bukan jaminan gerak tanpa jitter.
+The application task writes flash when state changes, movement finishes, or a moving checkpoint meets the five-second interval and minimum change of 50 steps. Identical records are not rewritten. ESP32 flash operations may still affect system timing; separate tasks do not guarantee motion without jitter.
 
-## Jaringan dan dashboard
+## Network and dashboard
 
-Wi-Fi dicoba kembali setiap 10 detik, dan Blynk setiap lima detik dengan budget `connect(250)`. Tidak ada `delay(1000)` pada jalur reconnect aplikasi. Panggilan koneksi Blynk tetap dapat menunggu hingga timeout tersebut; task motor berjalan terpisah.
+Wi-Fi retries every 10 seconds. Blynk retries every five seconds with a `connect(250)` budget. The reconnect path does not contain `delay(1000)`. Connection work may still block the application task; the motor task runs separately.
 
-Semua virtual pin dipublikasikan dari satu lokasi, paling banyak delapan nilai aplikasi per interval satu detik, termasuk reset tombol. Reconnect menghapus cache sehingga dashboard kembali menampilkan state perangkat. Nilai V0 lama di cloud tidak otomatis mengaktifkan perangkat yang sudah OFF.
+All virtual pins are published from one location, with at most eight application values per one-second interval, including button resets. Reconnection invalidates the cache and refreshes the dashboard from device state. An older cloud V0 value does not automatically enable a device that is OFF.
 
-Callback power/mode menandai V0–V2 untuk dikirim ulang pada jadwal publikasi berikutnya, walaupun state lokal tidak berubah. Dengan demikian, perintah V1/V2 saat OFF yang ditolak controller dikoreksi menjadi nol pada dashboard. Flag koreksi tetap tertunda ketika belum tersambung atau interval satu detik belum lewat.
+Power and mode callbacks mark V0-V2 for publication at the next scheduled interval, even when local state is unchanged. V1/V2 commands rejected while OFF are therefore corrected to zero on the dashboard. Pending corrections survive disconnection or an interval that has not yet elapsed.
 
-Pin, kecepatan, percepatan, interval, dan kalibrasi dapat diubah pada `src/config/HardwareConfig.h`. Perubahan harus disertai build dan pengujian yang sesuai.
+Pins, speed, acceleration, intervals, and calibration are configured in `src/config/HardwareConfig.h`. Changes require the relevant build and verification checks.

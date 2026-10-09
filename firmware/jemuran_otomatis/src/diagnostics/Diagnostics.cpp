@@ -23,7 +23,7 @@ const char* resetReasonName(esp_reset_reason_t reason) {
 
 void printBootDiagnostics() {
   const esp_reset_reason_t reason = esp_reset_reason();
-  Serial.printf("\n[BOOT] Jemuran modular | reset=%s (%d) | SDK=%s\n",
+  Serial.printf("\n[BOOT] DryGuard firmware | reset=%s (%d) | SDK=%s\n",
                 resetReasonName(reason), static_cast<int>(reason), ESP.getSdkVersion());
   printMemoryDiagnostics();
 }

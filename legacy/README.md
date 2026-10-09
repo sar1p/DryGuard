@@ -1,7 +1,7 @@
-# Arsip program sebelumnya
+# Archive of previous programs
 
-`kodingan_iot.cpp` dan `NOT-STABLE_Embedded.cpp` dipindahkan dari root repository dengan isi yang sama persis seperti commit awal pekerjaan `578a8c5`. Keduanya disimpan untuk perbandingan, bukan ikut dikompilasi pada build firmware modular.
+`kodingan_iot.cpp` and `NOT-STABLE_Embedded.cpp` were moved from the repository root with contents exactly matching those in the initial project commit `578a8c5`. Both are kept for comparison and are not compiled as part of the modular firmware build.
 
-`NOT-STABLE_Embedded.cpp` memiliki catatan commit sebelumnya tentang restart saat beban penuh. Nama folder arsip tidak menyatakan bahwa salah satu program telah lulus pengujian hardware.
+`NOT-STABLE_Embedded.cpp` has a note in the previous commit about restarting under full load. The archive folder name does not mean that either program has passed hardware testing.
 
-Untuk memakai sketch lama melalui Arduino IDE, salin file yang dipilih ke folder sketch terpisah dan gunakan nama file `.ino` yang sama dengan foldernya. Isi konfigurasi perangkat sendiri sebelum mengunggah. Cocokkan kembali posisi fisik ketika berpindah firmware, karena masing-masing versi dapat membaca namespace/checkpoint berbeda.
+To use an old sketch in the Arduino IDE, copy the selected file to a separate sketch folder and use a `.ino` filename that matches the folder name. Fill in your own device configuration before uploading. Reconcile the physical position after switching firmware, because each version may read a different namespace/checkpoint.

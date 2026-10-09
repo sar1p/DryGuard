@@ -1,4 +1,5 @@
-name: Firmware CI
+name: Modularize firmware and improve clothesline control
+run-name: Modularize firmware and improve clothesline control
 
 on:
   push:

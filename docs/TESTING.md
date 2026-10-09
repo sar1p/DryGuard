@@ -1,43 +1,43 @@
-# Pengujian
+# Testing
 
-## Pengujian otomatis
+## Automated Tests
 
 ```powershell
 python tools/run_tests.py
 ```
 
-Runner membutuhkan GCC atau Clang pada PATH. Bila compiler berada di lokasi lain, atur `CXX` ke path executable compiler. Tes mengompilasi **kode C++ yang sama dengan firmware**, bukan implementasi ulang dalam Python.
+The runner requires GCC or Clang on `PATH`. If the compiler is in another location, set `CXX` to the compiler executable path. The tests compile the **same C++ code used by the firmware**, rather than a Python reimplementation.
 
-Tes core mencakup startup/restart OFF, cuaca otomatis, hysteresis termasuk pemulihan setelah ADC invalid, pergantian mode, override manual, penolakan perintah saat OFF, pause/resume setelah enable, target penuh `4000`, checkpoint posisi hold, record korup, dan debounce saat `millis()` melingkar.
+The 20 core tests cover OFF at startup/restart, automatic weather response, hysteresis including recovery after an invalid ADC reading, mode changes, manual override, command rejection while OFF, pause/resume after enabling, the full `4000` target, position-hold checkpoints, corrupted records, and debounce across `millis()` rollover.
 
-Tes gateway mengompilasi `BlynkGateway.cpp` yang sama dengan firmware bersama controller asli. Stub API Arduino, Wi-Fi, dan Blynk mencatat nilai yang dipublikasikan untuk memeriksa koreksi switch yang ditolak saat OFF, interval pengiriman, input callback, dan refresh setelah reconnect. Salinan sumber dan header dummy dibuat hanya di `build/native/gateway/`; runner tidak membaca atau menimpa `Secrets.h` pribadi.
+The 5 gateway tests compile the same `BlynkGateway.cpp` used by the firmware together with the original controller. Arduino, Wi-Fi, and Blynk API stubs record published values to check rejected switch corrections while OFF, send intervals, input callbacks, and refresh after reconnect. Source copies and dummy headers are created only in `build/native/gateway/`; the runner does not read or overwrite your private `Secrets.h`.
 
-GitHub Actions menjalankan dua pemeriksaan:
+GitHub Actions runs two checks:
 
-1. **Native C++ tests**: kompilasi dengan C++11, warning sebagai error, dan menjalankan tes core serta gateway.
-2. **ESP32 firmware build**: build PlatformIO menggunakan dependency yang dipatok, lalu memeriksa konfigurasi tanpa jaringan dan konfigurasi jaringan dummy melalui header lokal.
+1. **Native C++ tests**: compile with C++11, treat warnings as errors, and run the 20 core tests and 5 gateway tests.
+2. **ESP32 firmware build**: build with PlatformIO using pinned dependencies, then check configurations with networking disabled and with dummy network settings in a local header.
 
-`.\.venv\Scripts\python.exe tools/check_configured_build.py` memeriksa varian jaringan aktif dengan kredensial dummy pada Windows setelah setup PlatformIO. Tool ini menolak menimpa `Secrets.h` yang sudah ada dan menghapus header dummy buatannya setelah build. Binary yang dihasilkan memakai data dummy; build ulang dengan kredensial perangkat sendiri sebelum upload.
+On Windows, after setting up PlatformIO, `.\.venv\Scripts\python.exe tools/check_configured_build.py` checks the network-enabled variant with dummy credentials. The tool refuses to overwrite an existing `Secrets.h` and removes the dummy header it created after the build. The resulting binary uses dummy data; rebuild with your device credentials before uploading.
 
-Stub gateway memeriksa logika firmware terhadap API pengganti yang minimal; perilaku library/server Blynk asli, RTOS scheduler, flash ESP32, suplai daya, dan mekanisme motor tetap memerlukan pengujian tersendiri. Build firmware memeriksa kompatibilitas compile/link; kedua pemeriksaan tersebut belum membuktikan perilaku hardware.
+The gateway stubs check firmware logic against minimal replacement APIs; the behavior of the actual Blynk library/server, RTOS scheduler, ESP32 flash, power supply, and motor mechanism still requires separate testing. The firmware build checks compile/link compatibility; neither check proves hardware behavior. No physical hardware tests have been verified yet.
 
-## Matriks uji perangkat
+## Device Test Matrix
 
-Seluruh baris berikut memerlukan pengujian fisik; jangan menandainya lulus hanya karena CI berhasil.
+Every scenario below requires physical testing; do not mark it as passed just because CI succeeded.
 
-| Skenario | Hasil yang diperiksa |
+| Scenario | Expected result |
 |---|---|
-| Boot pertama, jemuran berada di dalam | Estimasi 0 dan sistem OFF; V0 ON lalu V1 menjalankan automatic |
-| Kering dan terang | Target luar, gerak selesai tanpa stall atau reset |
-| Hujan saat bergerak keluar | Target berubah ke dalam; tidak terus melewati batas mekanik |
-| Gelap | Automatic mengarah ke dalam |
-| Nilai sensor dekat ambang | Tidak berganti arah berulang pada noise kecil |
-| V1/V2 ON saat V0 OFF | Motor tetap hold dan switch mode kembali OFF pada jadwal dashboard berikutnya |
-| Mode manual dan V3/V4 | Mode benar, tombol kembali nol, arah sesuai wiring |
-| V0 OFF di tengah gerak | Gerak berhenti, posisi disimpan setelah hold diakui |
-| V0 ON setelah pause manual | Tujuan sebelumnya dilanjutkan, estimasi cocok dengan posisi nyata |
-| Reboot di tengah gerak | Checkpoint dibaca dan sistem OFF; ukur selisih estimasi terhadap posisi fisik sebelum V0 ON |
-| Wi-Fi/Blynk terputus lalu tersambung | Logika lokal tetap berjalan, dashboard diperbarui saat reconnect |
-| Beban ringan hingga beban penggunaan | Catat reset reason, suplai, suhu driver/motor, dan langkah terlewat |
+| First boot, clothesline retracted | Estimate is 0 and system is OFF; V0 ON followed by V1 starts automatic mode |
+| Dry and bright | Target is extended; movement completes without a stall or reset |
+| Rain while extending | Target changes to retracted; the mechanism does not continue past its mechanical limit |
+| Dark | Automatic mode targets retracted |
+| Sensor reading near threshold | Direction does not keep changing due to small amounts of noise |
+| V1/V2 ON while V0 is OFF | Motor remains held and the mode switch is corrected to OFF at the next dashboard interval |
+| Manual mode and V3/V4 | Mode is correct, button returns to zero, direction matches the wiring |
+| V0 OFF during movement | Movement stops; position is saved after the hold is acknowledged |
+| V0 ON after a manual pause | The previous target resumes; estimate matches the actual position |
+| Reboot during movement | Checkpoint is read and system is OFF; measure the difference between the estimate and physical position before V0 ON |
+| Wi-Fi/Blynk disconnects and reconnects | Local logic continues running; dashboard updates on reconnect |
+| Light load through normal-use load | Record reset reason, supply voltage, driver/motor temperature, and missed steps |
 
-Kenaikan beban dilakukan bertahap sesuai kemampuan mekanisme. Bila estimasi berbeda dari posisi nyata, hentikan pengujian dan cocokkan kembali posisi sebelum melanjutkan. Limit switch/encoder dan prosedur homing belum tersedia di proyek ini.
+Increase load gradually within the mechanism's capability. If the estimate differs from the actual position, stop testing and reconcile the position before continuing. Limit switches/encoders and a homing procedure are not yet available in this project.

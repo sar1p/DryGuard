@@ -18,22 +18,22 @@ jemuran::BlynkGateway* gateway = nullptr;
 
 const char* weatherText(const jemuran::DashboardState& state) {
   if (!state.control.enabled) return "OFF";
-  if (!state.sensors.valid) return "MEMBACA";
-  return state.sensors.raining ? "HUJAN" : "KERING";
+  if (!state.sensors.valid) return "READING";
+  return state.sensors.raining ? "RAIN" : "DRY";
 }
 
 const char* lightText(const jemuran::DashboardState& state) {
   if (!state.control.enabled) return "-";
-  if (!state.sensors.valid) return "MEMBACA";
-  return state.sensors.dark ? "GELAP" : "TERANG";
+  if (!state.sensors.valid) return "READING";
+  return state.sensors.dark ? "DARK" : "BRIGHT";
 }
 
 const char* positionText(const jemuran::DashboardState& state) {
-  if (!state.control.enabled) return "SISTEM MATI";
-  if (state.motor.moving) return state.motor.target > state.motor.position ? "KELUAR >>" : "<< MASUK";
-  if (state.motor.position <= jemuran::config::kSettings.insidePosition + 100) return "DALAM";
-  if (state.motor.position >= jemuran::config::kSettings.outsidePosition - 100) return "LUAR";
-  return "TENGAH";
+  if (!state.control.enabled) return "SYSTEM OFF";
+  if (state.motor.moving) return state.motor.target > state.motor.position ? "EXTENDING >>" : "<< RETRACTING";
+  if (state.motor.position <= jemuran::config::kSettings.insidePosition + 100) return "RETRACTED";
+  if (state.motor.position >= jemuran::config::kSettings.outsidePosition - 100) return "EXTENDED";
+  return "PARTIAL";
 }
 }  // namespace
 

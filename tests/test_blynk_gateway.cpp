@@ -112,7 +112,7 @@ void repeatedSwitchesRespectCadenceAndWriteBound() {
   allPinsWrittenOnce();
   writeInt(V0, 1); writeInt(V1, 1); writeInt(V2, 0);
   writeInt(V3, 0); writeInt(V4, 0);
-  writeText(V5, "KERING"); writeText(V6, "TERANG"); writeText(V7, "KELUAR >>");
+  writeText(V5, "DRY"); writeText(V6, "BRIGHT"); writeText(V7, "EXTENDING >>");
 }
 
 void invalidInputsNeverReachController() {
@@ -131,7 +131,7 @@ void reconnectRefreshesDashboard() {
   allPinsWrittenOnce();
   writeInt(V0, 1); writeInt(V1, 1); writeInt(V2, 0);
   writeInt(V3, 0); writeInt(V4, 0);
-  writeText(V5, "KERING"); writeText(V6, "TERANG"); writeText(V7, "DALAM");
+  writeText(V5, "DRY"); writeText(V6, "BRIGHT"); writeText(V7, "RETRACTED");
 }
 }  // namespace
 

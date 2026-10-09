@@ -1,73 +1,73 @@
-# DryGuard — Jemuran Otomatis ESP32 dan Blynk
+# DryGuard — ESP32 and Blynk Automatic Clothesline
 
-DryGuard adalah firmware jemuran otomatis dengan sensor hujan, sensor cahaya, motor stepper 5 V, dan driver ULN2003. Mode otomatis memasukkan jemuran ketika hujan atau gelap, lalu mengeluarkannya ketika kering dan terang. Mode manual menyediakan perintah masuk/keluar melalui Blynk.
+DryGuard is automatic clothesline firmware with a rain sensor, a light sensor, a 5 V stepper motor, and a ULN2003 driver. Automatic mode retracts the clothesline when it rains or gets dark, then extends it when conditions are dry and bright. Manual mode provides retract/extend commands through Blynk.
 
-Versi ini memisahkan kode berdasarkan tanggung jawab, memakai antrean FreeRTOS untuk kontrol motor, menyimpan checkpoint melalui Preferences/NVS, dan menyediakan build serta pengujian otomatis. Dua sketch sebelumnya tersedia di [`legacy/`](legacy/README.md) sebagai rujukan.
+This version separates code by responsibility, uses a FreeRTOS queue for motor control, stores checkpoints through Preferences/NVS, and provides automated builds and tests. Two previous sketches are available in [`legacy/`](legacy/README.md) for reference.
 
-## Perangkat yang dituju
+## Target hardware
 
-- ESP32 klasik dengan dua core; target build `esp32dev` / ESP32 Dev Module. Sebutan perangkat pengguna adalah "ESP32D"; nomor board lengkap belum dikonfirmasi.
-- Stepper empat fase 5 V dengan driver ULN2003, sesuai perangkat proyek sebelumnya.
-- Sensor hujan analog dan sensor cahaya analog, masing-masing dibaca sebagai ADC 12 bit.
-- Blynk dengan virtual pin V0–V7.
+- Classic ESP32 with two cores; build target `esp32dev` / ESP32 Dev Module. The user refers to the device as "ESP32D"; the full board model has not been confirmed.
+- Four-phase 5 V stepper motor with a ULN2003 driver, matching the hardware used by the previous project.
+- Analog rain and light sensors, sampled with 12-bit ADC resolution.
+- Blynk with virtual pins V0–V7.
 
-| Perangkat | GPIO |
+| Device | GPIO |
 |---|---:|
 | ULN2003 IN1 | 13 |
 | ULN2003 IN2 | 12 |
 | ULN2003 IN3 | 14 |
 | ULN2003 IN4 | 27 |
-| Sensor hujan — analog | 34 |
-| Sensor cahaya — analog | 35 |
+| Rain sensor — analog | 34 |
+| Light sensor — analog | 35 |
 
-Urutan constructor motor tetap **IN1, IN3, IN2, IN4**, sesuai sketch awal. Posisi dalam `0`, posisi luar `4000`, ambang hujan `< 2800`, dan ambang gelap `> 3400`. Konfigurasi ini adalah nilai awal dari kode proyek, bukan hasil kalibrasi ulang mekanisme.
+The motor constructor order remains **IN1, IN3, IN2, IN4**, as in the original sketch. The retracted position is `0`, the extended position is `4000`, the rain threshold is `< 2800`, and the darkness threshold is `> 3400`. These are initial values from the project code, not the result of a new mechanical calibration.
 
-## Struktur proyek
+## Project structure
 
 ```text
 firmware/jemuran_otomatis/
-  jemuran_otomatis.ino      # entry sketch Arduino IDE
+  jemuran_otomatis.ino      # Arduino IDE entry sketch
   src/
-    main.cpp               # setup/loop singkat
-    Secrets.example.h      # contoh konfigurasi jaringan
-    config/                # pin, kalibrasi, interval, ukuran task
-    core/                  # logika murni C++ dan format checkpoint
-    app/                   # orkestrasi aplikasi
-    motor/                 # satu task pemilik AccelStepper
-    sensors/               # pembacaan ADC dan filter
-    storage/               # Preferences/NVS dan migrasi
+    main.cpp               # brief setup/loop
+    Secrets.example.h      # example network configuration
+    config/                # pins, calibration, intervals, task sizes
+    core/                  # pure C++ logic and checkpoint format
+    app/                   # application orchestration
+    motor/                 # single task that owns AccelStepper
+    sensors/               # ADC readings and filtering
+    storage/               # Preferences/NVS and migration
     iot/                   # Wi-Fi, Blynk, dashboard
-    diagnostics/           # alasan reset dan kondisi heap
-tests/                     # tes regresi core C++
-tools/                     # runner pengujian
-docs/                      # setup, arsitektur, pengujian, troubleshooting
-legacy/                    # dua program asli
-.github/workflows/ci.yml    # build ESP32 dan tes pada GitHub Actions
-platformio.ini             # versi platform/library yang dipatok
+    diagnostics/           # reset reason and heap status
+tests/                     # core and Blynk gateway regression tests
+tools/                     # test runner
+docs/                      # setup, architecture, testing, troubleshooting
+legacy/                    # two original programs
+.github/workflows/ci.yml    # ESP32 build and tests on GitHub Actions
+platformio.ini             # pinned platform/library versions
 ```
 
-## Mulai menggunakan
+## Getting started
 
-1. Salin `firmware/jemuran_otomatis/src/Secrets.example.h` menjadi `Secrets.h` di folder yang sama, lalu isi template Blynk, token, SSID, dan password Wi-Fi. `Secrets.h` diabaikan Git.
-2. Siapkan dashboard sesuai tabel [virtual pin Blynk](docs/SETUP.md#dashboard-blynk).
-3. Build menggunakan PlatformIO atau buka `firmware/jemuran_otomatis/jemuran_otomatis.ino` melalui Arduino IDE. Tidak perlu mengganti ekstensi file `.cpp`.
-4. Pada **setiap boot/restart**, sistem mulai **OFF** sambil mempertahankan tujuan yang tersimpan. Cocokkan posisi fisik dengan estimasi yang ditampilkan Serial Monitor sebelum menyalakan V0. V0 ON langsung mengaktifkan mode tersimpan; pada boot pertama, mode bawaan adalah automatic.
-5. Setelah V0 ON, pilih otomatis melalui V1, atau manual melalui V2/V3/V4. Perintah mode saat OFF diabaikan dan switch dashboard dikembalikan ke status perangkat.
+1. Copy `firmware/jemuran_otomatis/src/Secrets.example.h` to `Secrets.h` in the same folder, then fill in the Blynk template, token, SSID, and Wi-Fi password. `Secrets.h` is ignored by Git.
+2. Prepare the dashboard according to the [Blynk virtual pin table](docs/SETUP.md#blynk-dashboard).
+3. Build with PlatformIO or open `firmware/jemuran_otomatis/jemuran_otomatis.ino` in the Arduino IDE. There is no need to change the `.cpp` file extension.
+4. On **every boot/restart**, the system starts **OFF** while retaining the saved target. Match the physical position to the estimate shown in Serial Monitor before turning on V0. V0 ON immediately activates the saved mode; on the first boot, the default mode is automatic.
+5. After V0 ON, select automatic mode through V1, or manual mode through V2/V3/V4. Mode commands issued while OFF are ignored, and the dashboard switch is restored to the device status.
 
-Panduan lengkap: [setup dan build](docs/SETUP.md), [arsitektur](docs/ARCHITECTURE.md), [pengujian](docs/TESTING.md), dan [penelusuran restart](docs/TROUBLESHOOTING.md).
+Full guides: [setup and build](docs/SETUP.md), [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md), and [restart troubleshooting](docs/TROUBLESHOOTING.md).
 
-## Perbaikan utama
+## Main improvements
 
-- Objek motor diakses hanya oleh task motor; task aplikasi mengirim target/hold melalui queue dan membaca snapshot.
-- Power OFF menghentikan gerak sambil mempertahankan tujuan yang tertunda. Tujuan resume tidak ditimpa kembali oleh proses boot; setelah restart, perjalanan dilanjutkan melalui V0 ON setelah posisi diperiksa.
-- Mode automatic/manual menggunakan satu enum, sehingga keduanya tidak aktif bersamaan.
-- Pembacaan median dan hysteresis mengurangi pergantian arah akibat noise di sekitar ambang sensor. Alarm sebelumnya tetap memakai margin pembersihan setelah sampel tidak valid.
-- Penyimpanan memakai satu record dengan schema, checksum, dan validasi rentang. Checkpoint bergerak dibuat paling cepat setiap lima detik, selain perubahan perintah/status dan akhir gerak.
-- Dashboard dikirim saat nilai berubah, dengan interval satu detik. Switch power/mode juga dikoreksi setelah perintah diterima, termasuk perintah mode yang ditolak saat OFF. State perangkat dipublikasikan kembali saat reconnect.
-- Boot mencetak alasan reset; diagnostik heap dan sensor dicetak setiap menit.
+- The motor object is accessed only by the motor task; the application task sends targets/holds through a queue and reads snapshots.
+- Power OFF stops movement while preserving a pending target. The resume target is not overwritten by the boot process; after restart, movement resumes when V0 is turned ON after the position is checked.
+- Automatic/manual modes use a single enum, so both cannot be active at the same time.
+- Median sampling and hysteresis reduce direction changes caused by noise around sensor thresholds. The previous alarm still uses a clearing margin after an invalid sample.
+- Storage uses a single record with a schema, checksum, and range validation. Motion checkpoints are written no more frequently than every five seconds, in addition to command/status changes and the end of movement.
+- Dashboard updates are sent when values change, at one-second intervals. Power/mode switches are also corrected after a command is received, including mode commands rejected while OFF. Device state is republished on reconnect.
+- Boot prints the reset reason; heap and sensor diagnostics are printed every minute.
 
-## Batas pengujian dan posisi
+## Testing and position limits
 
-Firmware menghitung langkah; proyek saat ini tidak mempunyai input limit switch atau encoder di kode. Estimasi posisi dapat meleset akibat langkah terlewat, gerakan saat listrik mati, atau hilangnya langkah sejak checkpoint terakhir. Resume tidak menggantikan homing fisik.
+Firmware counts steps; the current project code has no limit switch input or encoder. The position estimate can drift because of missed steps, movement while power is off, or steps lost since the last checkpoint. Resume does not replace physical homing.
 
-Build dan tes logika tidak membuktikan bahwa restart saat beban penuh telah hilang. Pengujian catu daya, driver, mekanisme, dan firmware pada perangkat mengikuti [panduan pengujian](docs/TESTING.md). CI memeriksa konfigurasi kosong dan jaringan dummy. Artefak CI memakai kredensial dummy; buat build sendiri dengan `Secrets.h` untuk koneksi Blynk.
+Builds and logic tests do not prove that restarts under full load have been eliminated. Testing the power supply, driver, mechanism, and firmware on the device follows the [testing guide](docs/TESTING.md). CI checks an empty configuration and a dummy network. CI artifacts use dummy credentials; create your own build with `Secrets.h` for a Blynk connection.
