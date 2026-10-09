@@ -1,0 +1,10 @@
+.pio/
+.venv/
+build/
+__pycache__/
+.vscode/
+firmware/jemuran_otomatis/src/Secrets.h
+*.bin
+*.elf
+*.map
+*.log
