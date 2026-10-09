@@ -3,7 +3,7 @@
 build/
 __pycache__/
 .vscode/
-firmware/jemuran_otomatis/src/Secrets.h
+**/Secrets.h
 *.bin
 *.elf
 *.map

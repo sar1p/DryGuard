@@ -4,15 +4,15 @@
 
 | Module | Responsibility | Runtime owner |
 |---|---|---|
-| `app/Application` | Coordination, commands, and checkpoint scheduling | application task, core 0 |
-| `core/Controller` | Power, mode, motor destination, and pause/resume | application task |
-| `core/SensorPolicy` | Sensor thresholds and hysteresis | application task |
-| `core/StateCodec` | Encoding, schema, checksum, and record validation | application task / native tests |
-| `motor/MotorService` | AccelStepper, target limits, and position snapshots | motor task, core 1 |
-| `sensors/SensorService` | Median of five ADC samples, sampled every 200 ms | application task |
-| `storage/StateStore` | Preferences/NVS reads and writes | application task |
-| `iot/BlynkGateway` | Wi-Fi, reconnects, Blynk callbacks, and virtualWrite | application task |
-| `diagnostics/Diagnostics` | Reset reason and heap statistics | setup / application task |
+| `app/Application` | Coordination, commands, and checkpoint scheduling | `DryGuardApp` task, core 0 |
+| `core/Controller` | Power, mode, motor destination, and pause/resume | `DryGuardApp` task |
+| `core/SensorPolicy` | Sensor thresholds and hysteresis | `DryGuardApp` task |
+| `core/StateCodec` | Encoding, schema, checksum, and record validation | `DryGuardApp` task / native tests |
+| `motor/MotorService` | AccelStepper, target limits, and position snapshots | `DryGuardMotor` task, core 1 |
+| `sensors/SensorService` | Median of five ADC samples, sampled every 200 ms | `DryGuardApp` task |
+| `storage/StateStore` | Preferences/NVS reads and writes | `DryGuardApp` task |
+| `iot/BlynkGateway` | Wi-Fi, reconnects, Blynk callbacks, and virtualWrite | `DryGuardApp` task |
+| `diagnostics/Diagnostics` | Reset reason and heap statistics | setup / `DryGuardApp` task |
 
 After initialization, only the motor task calls AccelStepper methods. The application sends `MotionRequest` through a single-slot queue. The latest message contains the complete requested state, so old commands do not accumulate. A separate queue shares snapshots without accessing the motor object from another core.
 
@@ -34,11 +34,11 @@ Hold uses the motor task's actual step count. A snapshot that may be several ste
 
 ## Storage and migration
 
-The new namespace is `jemuran_v3`. Its `state` key contains a 32-byte record with position, target, mode, power, and motion intent. The schema version and checksum are checked before use. A single record avoids mixing values from separate key writes, but position accuracy still depends on step estimation and checkpoint timing.
+The canonical Preferences/NVS namespace is `dryguard_v3`. Its `state` key contains a 32-byte record with position, target, mode, power, and motion intent. The schema version and checksum are checked before use. A single record avoids mixing values from separate key writes, but position accuracy still depends on step estimation and checkpoint timing.
 
-Valid data from `jemuran_v2` or `jemuran` can be imported when no new record exists. Preferences resume flags from the experimental version are checked. The original EEPROM resume flag is not imported. Older namespaces are retained. Migration starts OFF because the two older sketches did not save power state consistently.
+Read-only aliases for earlier saved checkpoints are centralized in `firmware/dryguard/src/storage/StorageKeys.h`. If the canonical checkpoint is absent, a valid earlier encoded checkpoint can be imported; supported older Preferences checkpoints remain readable as well. The earlier resume experiment's EEPROM flag is not imported. Migration starts OFF because earlier firmware did not save power state consistently. The aliases are read-only, so migration does not update earlier checkpoints.
 
-An invalid new record starts the system OFF; legacy data does not replace a corrupt new checkpoint. On first boot, the initial estimate is the retracted position `0`. Check the mechanism before enabling the system.
+A corrupt canonical checkpoint starts the system OFF and blocks fallback. A present but corrupt earlier encoded checkpoint also blocks fallback to older Preferences data, avoiding restoration of a stale estimate. On first boot, the initial estimate is the retracted position `0`. Check the mechanism before enabling the system.
 
 The application task writes flash when state changes, movement finishes, or a moving checkpoint meets the five-second interval and minimum change of 50 steps. Identical records are not rewritten. ESP32 flash operations may still affect system timing; separate tasks do not guarantee motion without jitter.
 
@@ -50,4 +50,4 @@ All virtual pins are published from one location, with at most eight application
 
 Power and mode callbacks mark V0-V2 for publication at the next scheduled interval, even when local state is unchanged. V1/V2 commands rejected while OFF are therefore corrected to zero on the dashboard. Pending corrections survive disconnection or an interval that has not yet elapsed.
 
-Pins, speed, acceleration, intervals, and calibration are configured in `src/config/HardwareConfig.h`. Changes require the relevant build and verification checks.
+Pins, speed, acceleration, intervals, and calibration are configured in `firmware/dryguard/src/config/HardwareConfig.h`. Changes require the relevant build and verification checks.

@@ -10,7 +10,7 @@
 #include "core/SensorPolicy.h"
 #include "core/StateCodec.h"
 
-using namespace jemuran;
+using namespace dryguard;
 
 namespace {
 void require(bool condition, const char* message) {

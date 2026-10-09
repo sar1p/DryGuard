@@ -7,7 +7,7 @@ import sys
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    secrets = root / "firmware" / "jemuran_otomatis" / "src" / "Secrets.h"
+    secrets = root / "firmware" / "dryguard" / "src" / "Secrets.h"
     dummy = (
         '#pragma once\n'
         '// Build validation only; these are not real credentials.\n'

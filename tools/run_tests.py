@@ -1,4 +1,4 @@
-"""Compile and run actual firmware core and gateway C++ without ESP32 hardware."""
+"""Compile and run firmware core, gateway, and storage C++ without ESP32 hardware."""
 
 from pathlib import Path
 import os
@@ -13,7 +13,7 @@ def main() -> int:
     if not compiler:
         print("C++ compiler missing. Install GCC/Clang or run the GitHub Actions tests.", file=sys.stderr)
         return 2
-    source = root / "firmware" / "jemuran_otomatis" / "src"
+    source = root / "firmware" / "dryguard" / "src"
     build = root / "build" / "native"
     build.mkdir(parents=True, exist_ok=True)
     executable = build / ("controller_tests.exe" if os.name == "nt" else "controller_tests")
@@ -54,7 +54,21 @@ def main() -> int:
         str(source / "core" / "Controller.cpp"), "-o", str(gateway_executable),
     ]
     subprocess.run(gateway_command, cwd=root, check=True)
-    return subprocess.run([str(gateway_executable)], cwd=root, check=False).returncode
+    gateway_result = subprocess.run([str(gateway_executable)], cwd=root, check=False)
+    if gateway_result.returncode:
+        return gateway_result.returncode
+
+    storage_executable = build / ("state_store_tests.exe" if os.name == "nt" else "state_store_tests")
+    storage_command = [
+        compiler, "-std=c++11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O2",
+        "-I", str(source), "-I", str(root / "tests" / "fakes"),
+        str(root / "tests" / "test_state_store.cpp"),
+        str(source / "storage" / "StateStore.cpp"),
+        str(source / "core" / "Controller.cpp"),
+        str(source / "core" / "StateCodec.cpp"), "-o", str(storage_executable),
+    ]
+    subprocess.run(storage_command, cwd=root, check=True)
+    return subprocess.run([str(storage_executable)], cwd=root, check=False).returncode
 
 
 if __name__ == "__main__":
