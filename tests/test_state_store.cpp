@@ -7,12 +7,12 @@
 
 #include <Arduino.h>
 
+#include "Preferences.h"
 #include "config/HardwareConfig.h"
 #include "core/Controller.h"
 #include "core/StateCodec.h"
 #include "storage/StateStore.h"
 #include "storage/StorageKeys.h"
-#include "Preferences.h"
 
 using namespace dryguard;
 
@@ -25,207 +25,160 @@ void require(bool condition, const char* message) {
   if (!condition) throw std::runtime_error(message);
 }
 
-void seedRecord(const char* name, const SavedState& state) {
-  const StateRecord record = encodeState(state);
-  fake_preferences::seedBytes(name, storage_keys::kStateKey, &record, sizeof(record));
-}
-
-SavedState safeDefault() { return defaultState(config::kSettings); }
-
 void requireSafeDefault(const SavedState& state, const char* message) {
-  require(sameState(state, safeDefault()), message);
-  require(!state.enabled && !state.motionRequested, "safe default must remain OFF and hold");
+  const SavedState expected = {0, 0, Mode::Automatic, false, false};
+  require(sameState(state, expected), message);
+  require(state.position == 0 && !state.enabled && !state.motionRequested,
+          "safe default must be OFF at estimate 0");
 }
 
 SavedState loadFreshStore() {
   StateStore store;
-  require(store.begin(), "store must initialize");
+  require(store.begin(), "canonical store must initialize");
   return store.load();
 }
 
-void testCurrentNamespaceTakesPrecedence() {
+void testCurrentCheckpointLoadsFixedRecordAndRestoresOff() {
   fake_preferences::reset();
-  const SavedState current = {1234, 4000, Mode::Manual, true, true};
-  const SavedState previous = {700, 0, Mode::Automatic, false, true};
-  seedRecord(storage_keys::kCurrentNamespace, current);
-  seedRecord(storage_keys::kPreviousV3Namespace, previous);
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyPositionKey, 2000);
-
-  StateStore store;
-  require(store.begin(), "current store must initialize");
-  require(sameState(store.load(), current), "current checkpoint must win over every migration source");
-}
-
-void testPreviousV3ImportsOffAndSavesCanonically() {
-  fake_preferences::reset();
-  const SavedState previous = {1532, 4000, Mode::Manual, true, true};
-  // Fixed fixture from the previous stored format, independent of the encoder.
-  const StateRecord previousRecord = {{
+  const StateRecord fixture = {{
       0x4A454D33u, 1u, 1532u, 4000u, 2u, 1u, 1u, 0x64540b6bu}};
-  fake_preferences::seedBytes(storage_keys::kPreviousV3Namespace,
-      storage_keys::kStateKey, &previousRecord, sizeof(previousRecord));
-  const std::vector<uint8_t> before = fake_preferences::bytes(
-      storage_keys::kPreviousV3Namespace, storage_keys::kStateKey);
+  fake_preferences::seedBytes(storage_keys::kCurrentNamespace,
+      storage_keys::kStateKey, &fixture, sizeof(fixture));
 
   StateStore store;
-  require(store.begin(), "current store must initialize");
-  SavedState imported = store.load();
-  SavedState expected = previous;
-  expected.enabled = false;
-  require(sameState(imported, expected), "previous record must preserve movement intent while powering OFF");
-  require(store.save(imported), "normal checkpoint save must persist the imported state");
-  require(fake_preferences::hasKey(storage_keys::kCurrentNamespace, storage_keys::kStateKey),
-          "canonical checkpoint must be created");
+  require(store.begin(), "canonical store must initialize");
+  const SavedState loaded = store.load();
+  require(loaded.position == 1532 && loaded.target == 4000,
+          "fixed current checkpoint must preserve position and target");
+  require(loaded.mode == Mode::Manual && loaded.enabled && loaded.motionRequested,
+          "fixed current checkpoint must preserve mode, power, and intent");
 
-  const std::vector<uint8_t> saved = fake_preferences::bytes(
+  Controller controller(config::kSettings);
+  controller.restore(loaded);
+  require(!controller.state().enabled && !controller.motionRequest().move,
+          "controller restore must keep startup OFF");
+  require(controller.state().target == 4000 && controller.state().motionRequested,
+          "controller restore must keep the stored destination and intent");
+}
+
+void testMissingCurrentCheckpointIgnoresUnrelatedNamespace() {
+  fake_preferences::reset();
+  const StateRecord unrelated = {{
+      0x4A454D33u, 1u, 1532u, 4000u, 2u, 1u, 1u, 0x64540b6bu}};
+  fake_preferences::seedBytes("unrelated_store", storage_keys::kStateKey,
+      &unrelated, sizeof(unrelated));
+
+  const SavedState loaded = loadFreshStore();
+  requireSafeDefault(loaded,
+      "missing canonical checkpoint must ignore data in an unrelated namespace");
+}
+
+void testCorruptChecksumReturnsSafeDefault() {
+  fake_preferences::reset();
+  StateRecord corrupt = {{
+      0x4A454D33u, 1u, 1532u, 4000u, 2u, 1u, 1u, 0x64540b6bu}};
+  corrupt.words[7] ^= 1u;
+  fake_preferences::seedBytes(storage_keys::kCurrentNamespace,
+      storage_keys::kStateKey, &corrupt, sizeof(corrupt));
+
+  requireSafeDefault(loadFreshStore(), "bad checkpoint checksum must return safe default");
+}
+
+void testIncorrectRecordLengthAndTypeReturnSafeDefault() {
+  fake_preferences::reset();
+  const uint8_t shortRecord[] = {1u, 2u, 3u};
+  fake_preferences::seedBytes(storage_keys::kCurrentNamespace,
+      storage_keys::kStateKey, shortRecord, sizeof(shortRecord));
+  requireSafeDefault(loadFreshStore(), "short checkpoint blob must return safe default");
+
+  fake_preferences::reset();
+  fake_preferences::seedInt(storage_keys::kCurrentNamespace,
+      storage_keys::kStateKey, 42);
+  requireSafeDefault(loadFreshStore(), "non-blob checkpoint value must return safe default");
+}
+
+void testSaveAndLoadRoundTripPreservesIntent() {
+  fake_preferences::reset();
+  const SavedState expected = {2715, 4000, Mode::Manual, false, true};
+  StateStore writer;
+  require(writer.begin(), "writer must initialize");
+  require(writer.save(expected), "valid checkpoint must save");
+
+  StateStore reader;
+  require(reader.begin(), "reader must initialize");
+  const SavedState loaded = reader.load();
+  require(sameState(loaded, expected),
+          "round trip must preserve position, target, mode, power, and intent");
+}
+
+void testInvalidSaveDoesNotReplaceLastGoodCheckpoint() {
+  fake_preferences::reset();
+  const SavedState good = {1100, 4000, Mode::Manual, false, true};
+  const SavedState invalid = {4001, 0, Mode::Manual, true, true};
+  StateStore store;
+  require(store.begin(), "store must initialize");
+  require(store.save(good), "valid checkpoint must save");
+  const std::vector<uint8_t> before = fake_preferences::bytes(
       storage_keys::kCurrentNamespace, storage_keys::kStateKey);
-  require(saved.size() == sizeof(StateRecord), "canonical checkpoint must retain the codec record size");
-  StateRecord decodedRecord{};
-  std::memcpy(&decodedRecord, &saved[0], sizeof(decodedRecord));
-  SavedState decoded = safeDefault();
-  require(decodeState(decodedRecord, config::kSettings, decoded), "saved canonical record must decode");
-  require(sameState(decoded, expected), "canonical checkpoint must contain the imported OFF state");
-  require(fake_preferences::bytes(storage_keys::kPreviousV3Namespace,
+  require(!store.save(invalid), "out-of-range state must be rejected");
+  require(fake_preferences::bytes(storage_keys::kCurrentNamespace,
               storage_keys::kStateKey) == before,
-          "read-only migration must leave the old record byte-for-byte unchanged");
+          "rejected state must not overwrite the last good checkpoint");
+
+  StateStore reader;
+  require(reader.begin(), "reader must initialize");
+  require(sameState(reader.load(), good), "last good checkpoint must remain readable");
 }
 
-void testCorruptCurrentBlocksEveryFallback() {
-  fake_preferences::reset();
-  StateRecord corrupt = encodeState({1000, 4000, Mode::Manual, true, true});
-  corrupt.words[2] ^= 1u;
-  fake_preferences::seedBytes(storage_keys::kCurrentNamespace, storage_keys::kStateKey,
-                               &corrupt, sizeof(corrupt));
-  seedRecord(storage_keys::kPreviousV3Namespace,
-             {1400, 4000, Mode::Manual, true, true});
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyPositionKey, 3000);
-
-  SavedState loaded = loadFreshStore();
-  requireSafeDefault(loaded, "corrupt current checkpoint must return the safe default");
-}
-
-void testCorruptPreviousV3BlocksOlderFields() {
-  fake_preferences::reset();
-  StateRecord corrupt = encodeState({800, 4000, Mode::Manual, true, true});
-  corrupt.words[7] ^= 0x80u;
-  fake_preferences::seedBytes(storage_keys::kPreviousV3Namespace, storage_keys::kStateKey,
-                               &corrupt, sizeof(corrupt));
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyPositionKey, 2100);
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyTargetKey, 4000);
-
-  SavedState loaded = loadFreshStore();
-  requireSafeDefault(loaded, "corrupt previous checkpoint must block stale field imports");
-}
-
-void testV2FieldsRetainPositionTargetModeAndIntentOff() {
-  fake_preferences::reset();
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyPositionKey, 1425);
-  fake_preferences::seedInt(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyTargetKey, 4000);
-  fake_preferences::seedBool(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyAutomaticModeKey, false);
-  fake_preferences::seedBool(storage_keys::kLegacyV2Namespace,
-      storage_keys::kLegacyManualModeKey, true);
-
-  const SavedState loaded = loadFreshStore();
-  require(loaded.position == 1425 && loaded.target == 4000,
-          "v2 position and target must be retained");
-  require(loaded.mode == Mode::Manual && loaded.motionRequested,
-          "v2 mode and pending intent must be retained");
-  require(!loaded.enabled, "v2 import must always start OFF");
-}
-
-void testV1ResumeRetainsPositionAndDestinationOff() {
-  fake_preferences::reset();
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyPositionKey, 900);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyTargetKey, 0);
-  fake_preferences::seedBool(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyAutomaticModeKey, true);
-  fake_preferences::seedBool(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyResumeFlagKey, true);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyResumeTargetKey, 1);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyResumePositionKey, 1860);
-
-  const SavedState loaded = loadFreshStore();
-  require(loaded.position == 1860 && loaded.target == config::kSettings.outsidePosition,
-          "v1 resume must retain its saved position and destination");
-  require(loaded.mode == Mode::Manual && loaded.motionRequested,
-          "v1 resume must restore manual motion intent");
-  require(!loaded.enabled, "v1 resume import must always start OFF");
-}
-
-void testMalformedLegacyDataReturnsSafeDefault() {
-  fake_preferences::reset();
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyPositionKey, 4001);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyTargetKey, 0);
-  fake_preferences::seedBool(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyAutomaticModeKey, false);
-  fake_preferences::seedBool(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyManualModeKey, true);
-  requireSafeDefault(loadFreshStore(), "out-of-range legacy position must be rejected");
-
-  fake_preferences::reset();
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyPositionKey, 1200);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyTargetKey, 4000);
-  fake_preferences::seedBool(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyResumeFlagKey, true);
-  fake_preferences::seedInt(storage_keys::kLegacyV1Namespace,
-      storage_keys::kLegacyResumeTargetKey, 7);
-  requireSafeDefault(loadFreshStore(), "invalid legacy resume destination must be rejected");
-}
-
-void testInitializationFailureAndFailedWriteRetry() {
+void testInitializationFailureIsReportedSafely() {
   fake_preferences::reset();
   fake_preferences::setBeginFailure(true);
-  StateStore unavailable;
-  require(!unavailable.begin(), "configured initialization failure must be reported");
-  requireSafeDefault(unavailable.load(), "unavailable storage must return safe default");
-  require(!unavailable.save(safeDefault()), "unavailable storage must reject writes");
-
-  fake_preferences::setBeginFailure(false);
   StateStore store;
-  require(store.begin(), "store must initialize after failure is cleared");
-  const SavedState checkpoint = {1111, 4000, Mode::Manual, false, true};
+  require(!store.begin(), "storage initialization failure must be reported");
+  requireSafeDefault(store.load(), "unavailable storage must return safe default");
+  require(!store.save({0, 0, Mode::Automatic, false, false}),
+          "unavailable storage must reject writes");
+}
+
+void testShortWriteCanRetryAndIdenticalSaveIsDeduplicated() {
+  fake_preferences::reset();
+  StateStore store;
+  require(store.begin(), "store must initialize");
+  const SavedState expected = {1111, 4000, Mode::Manual, false, true};
   fake_preferences::setNextPutLimit(sizeof(StateRecord) - 1);
-  require(!store.save(checkpoint), "short write must be reported as failed");
-  require(store.save(checkpoint), "failed write must be retryable");
-  require(fake_preferences::putBytesCalls() == 2, "retry must perform a second flash write");
+  require(!store.save(expected), "short write must be reported as failed");
+  require(store.save(expected), "short write must be retryable");
+  require(fake_preferences::putBytesCalls() == 2, "retry must issue a second write");
+
   const std::vector<uint8_t> saved = fake_preferences::bytes(
       storage_keys::kCurrentNamespace, storage_keys::kStateKey);
-  require(saved.size() == sizeof(StateRecord), "retry must replace the incomplete record");
+  require(saved.size() == sizeof(StateRecord), "retry must replace the short blob");
   StateRecord record{};
   std::memcpy(&record, &saved[0], sizeof(record));
-  SavedState decoded = safeDefault();
-  require(decodeState(record, config::kSettings, decoded) && sameState(decoded, checkpoint),
+  SavedState decoded = {0, 0, Mode::Automatic, false, false};
+  require(decodeState(record, config::kSettings, decoded) && sameState(decoded, expected),
           "retried checkpoint must be complete and valid");
-  require(store.save(checkpoint) && fake_preferences::putBytesCalls() == 2,
-          "identical saved state must avoid another write");
+  require(store.save(expected), "identical checkpoint save must succeed");
+  require(fake_preferences::putBytesCalls() == 2,
+          "identical checkpoint save must not issue another write");
 }
 }  // namespace
 
 int main() {
   const std::vector<std::pair<std::string, std::function<void()> > > tests = {
-    {"current namespace takes precedence", testCurrentNamespaceTakesPrecedence},
-    {"previous v3 imports OFF and saves canonically", testPreviousV3ImportsOffAndSavesCanonically},
-    {"corrupt current blocks every fallback", testCorruptCurrentBlocksEveryFallback},
-    {"corrupt previous v3 blocks older fields", testCorruptPreviousV3BlocksOlderFields},
-    {"v2 fields retain state while OFF", testV2FieldsRetainPositionTargetModeAndIntentOff},
-    {"v1 resume retains position and destination while OFF", testV1ResumeRetainsPositionAndDestinationOff},
-    {"malformed legacy data returns safe default", testMalformedLegacyDataReturnsSafeDefault},
-    {"initialization failure and failed write retry", testInitializationFailureAndFailedWriteRetry}
+    {"current fixed checkpoint loads and controller restores OFF",
+        testCurrentCheckpointLoadsFixedRecordAndRestoresOff},
+    {"missing current checkpoint ignores unrelated namespace",
+        testMissingCurrentCheckpointIgnoresUnrelatedNamespace},
+    {"corrupt checksum returns safe default", testCorruptChecksumReturnsSafeDefault},
+    {"incorrect record length and type return safe default",
+        testIncorrectRecordLengthAndTypeReturnSafeDefault},
+    {"save and load round trip preserves intent", testSaveAndLoadRoundTripPreservesIntent},
+    {"invalid save does not replace last good checkpoint",
+        testInvalidSaveDoesNotReplaceLastGoodCheckpoint},
+    {"initialization failure is reported safely", testInitializationFailureIsReportedSafely},
+    {"short write retry and identical save deduplication",
+        testShortWriteCanRetryAndIdenticalSaveIsDeduplicated}
   };
 
   unsigned failures = 0;

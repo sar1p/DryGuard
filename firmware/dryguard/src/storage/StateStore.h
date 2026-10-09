@@ -14,8 +14,6 @@ class StateStore {
   bool save(const SavedState& state);
 
  private:
-  bool readPreviousV3(SavedState& state, bool& present);
-  bool readLegacyFields(const char* name, SavedState& state);
   Preferences preferences_;
   bool ready_ = false;
   bool hasSaved_ = false;

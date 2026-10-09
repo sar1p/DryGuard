@@ -32,13 +32,11 @@ Each motor command carries a sequence number. The application waits for a snapsh
 
 Hold uses the motor task's actual step count. A snapshot that may be several steps old is not used as the stopping destination.
 
-## Storage and migration
+## Storage and checkpoints
 
-The canonical Preferences/NVS namespace is `dryguard_v3`. Its `state` key contains a 32-byte record with position, target, mode, power, and motion intent. The schema version and checksum are checked before use. A single record avoids mixing values from separate key writes, but position accuracy still depends on step estimation and checkpoint timing.
+Firmware reads and writes only the Preferences/NVS checkpoint at `dryguard_v3/state`. The key contains a 32-byte record with position, target, mode, power, and motion intent. Its existing bytes, codec magic, and schema are unchanged; the schema and checksum are checked before use. Checkpoints in older namespaces are ignored and left untouched.
 
-Read-only aliases for earlier saved checkpoints are centralized in `firmware/dryguard/src/storage/StorageKeys.h`. If the canonical checkpoint is absent, a valid earlier encoded checkpoint can be imported; supported older Preferences checkpoints remain readable as well. The earlier resume experiment's EEPROM flag is not imported. Migration starts OFF because earlier firmware did not save power state consistently. The aliases are read-only, so migration does not update earlier checkpoints.
-
-A corrupt canonical checkpoint starts the system OFF and blocks fallback. A present but corrupt earlier encoded checkpoint also blocks fallback to older Preferences data, avoiding restoration of a stale estimate. On first boot, the initial estimate is the retracted position `0`. Check the mechanism before enabling the system.
+If the current checkpoint is missing or invalid, startup uses position estimate `0` and remains OFF. A valid current checkpoint retains its saved estimate, target, and mode, while controller restore still forces startup OFF. In either case, step counting cannot confirm the physical position; checkpoint accuracy depends on missed steps, movement while powered off, and checkpoint timing. Align the rack with the retracted position before V0 ON when no valid current checkpoint exists.
 
 The application task writes flash when state changes, movement finishes, or a moving checkpoint meets the five-second interval and minimum change of 50 steps. Identical records are not rewritten. ESP32 flash operations may still affect system timing; separate tasks do not guarantee motion without jitter.
 
