@@ -64,6 +64,36 @@ int main() {
       require(sensors.update(3500, 3399).dark, "noise must not clear darkness");
       require(!sensors.update(3500, 3300).dark, "bright confirmation");
     }},
+    {"rain recovery after invalid input preserves the clearing margin", [] {
+      SensorPolicy sensors(config::kSettings);
+      Controller controller = runningController();
+      controller.updateSensors(sensors.update(2799, 2000));
+      require(controller.motionRequest().target == 0, "rain must retract");
+      const SensorReadings invalid = sensors.update(-1, 2000);
+      controller.updateSensors(invalid);
+      require(!invalid.valid && controller.motionRequest().target == 0, "invalid input must retract");
+      const SensorReadings recovering = sensors.update(2850, 2000);
+      controller.updateSensors(recovering);
+      require(recovering.valid && recovering.raining && controller.motionRequest().target == 0,
+              "recovery within rain hysteresis must not extend");
+      controller.updateSensors(sensors.update(2900, 2000));
+      require(controller.motionRequest().target == 4000, "dry margin must permit extension");
+    }},
+    {"darkness recovery after invalid input preserves the clearing margin", [] {
+      SensorPolicy sensors(config::kSettings);
+      Controller controller = runningController();
+      controller.updateSensors(sensors.update(3500, 3401));
+      require(controller.motionRequest().target == 0, "darkness must retract");
+      const SensorReadings invalid = sensors.update(3500, 4096);
+      controller.updateSensors(invalid);
+      require(!invalid.valid && controller.motionRequest().target == 0, "invalid input must retract");
+      const SensorReadings recovering = sensors.update(3500, 3350);
+      controller.updateSensors(recovering);
+      require(recovering.valid && recovering.dark && controller.motionRequest().target == 0,
+              "recovery within light hysteresis must not extend");
+      controller.updateSensors(sensors.update(3500, 3300));
+      require(controller.motionRequest().target == 4000, "bright margin must permit extension");
+    }},
     {"invalid ADC samples request inside in automatic mode", [] {
       SensorPolicy sensors(config::kSettings);
       Controller controller = runningController();

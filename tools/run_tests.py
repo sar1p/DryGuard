@@ -1,4 +1,4 @@
-"""Compile and run the firmware's actual core C++ code without ESP32 hardware."""
+"""Compile and run actual firmware core and gateway C++ without ESP32 hardware."""
 
 from pathlib import Path
 import os
@@ -25,7 +25,36 @@ def main() -> int:
         str(source / "core" / "StateCodec.cpp"), "-o", str(executable),
     ]
     subprocess.run(command, cwd=root, check=True)
-    return subprocess.run([str(executable)], cwd=root, check=False).returncode
+    result = subprocess.run([str(executable)], cwd=root, check=False)
+    if result.returncode:
+        return result.returncode
+
+    gateway_source = build / "gateway" / "src"
+    copies = (
+        "iot/BlynkGateway.cpp", "iot/BlynkGateway.h",
+        "core/Types.h", "config/HardwareConfig.h",
+    )
+    for relative in copies:
+        target = gateway_source / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / relative, target)
+    (gateway_source / "Secrets.h").write_text(
+        '#pragma once\n#define WIFI_SSID "gateway-host-test"\n'
+        '#define WIFI_PASSWORD "gateway-host-test-password"\n'
+        '#define BLYNK_AUTH_TOKEN "gateway-host-test-token"\n',
+        encoding="utf-8",
+    )
+
+    gateway_executable = build / ("gateway_tests.exe" if os.name == "nt" else "gateway_tests")
+    gateway_command = [
+        compiler, "-std=c++11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O2",
+        "-I", str(source), "-I", str(root / "tests" / "fakes"),
+        str(root / "tests" / "test_blynk_gateway.cpp"),
+        str(gateway_source / "iot" / "BlynkGateway.cpp"),
+        str(source / "core" / "Controller.cpp"), "-o", str(gateway_executable),
+    ]
+    subprocess.run(gateway_command, cwd=root, check=True)
+    return subprocess.run([str(gateway_executable)], cwd=root, check=False).returncode
 
 
 if __name__ == "__main__":

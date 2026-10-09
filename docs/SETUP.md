@@ -60,9 +60,11 @@ Buat datastream berikut pada template perangkat dan hubungkan widget ke virtual 
 | V4 | Integer, 0–1 | Keluar, tombol push |
 | V5 | String | Cuaca: HUJAN/KERING/OFF/MEMBACA |
 | V6 | String | Cahaya: GELAP/TERANG/-/MEMBACA |
-| V7 | String | Posisi/gerak: DALAM/LUAR/TENGAH/KELUAR/ MASUK/SISTEM MATI |
+| V7 | String | Posisi/gerak: `DALAM`, `LUAR`, `TENGAH`, `KELUAR >>`, `<< MASUK`, `SISTEM MATI` |
 
 State perangkat menjadi acuan saat reconnect. Pada setiap boot/restart, V0 dipublikasikan OFF; mode dan tujuan tersimpan tetap dipertahankan. Power ON mengaktifkan mode yang tersimpan setelah posisi diperiksa; jika mode Idle, pilih V1 atau V2/V3/V4.
+
+Pada boot pertama, mode bawaan adalah automatic; V0 ON dapat langsung meminta gerak berdasarkan sensor. V1/V2 hanya mengubah mode saat sistem ON. Jika mode dipilih saat OFF, firmware mengirim koreksi switch pada interval dashboard berikutnya.
 
 V3/V4 memilih mode manual secara otomatis. Perintah manual tetap bisa mengeluarkan jemuran ketika hujan; pilih V1 untuk mengaktifkan kembali perlindungan otomatis berdasarkan sensor.
 

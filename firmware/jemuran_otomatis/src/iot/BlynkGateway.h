@@ -32,6 +32,7 @@ class BlynkGateway {
   bool configured_ = false;
   bool wifiWasConnected_ = false;
   bool cacheValid_ = false;
+  bool refreshSwitches_ = false;
   bool hasPublished_ = false;
   bool resetInside_ = false;
   bool resetOutside_ = false;

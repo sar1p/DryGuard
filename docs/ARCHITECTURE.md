@@ -16,6 +16,8 @@
 
 Setelah inisialisasi, hanya task motor yang memanggil metode objek AccelStepper. Aplikasi mengirim `MotionRequest` melalui queue satu slot: pesan terbaru berisi seluruh tujuan yang berlaku, sehingga perintah lama tidak menumpuk. Snapshot dibagikan melalui queue terpisah, tanpa mengakses objek motor dari core lain.
 
+Queue menyimpan kondisi akhir yang diminta. Perintah yang segera digantikan sebelum diterima task motor dapat dilewati; perubahan OFF lalu ON bukan dua event yang wajib dijalankan berurutan.
+
 Setiap perintah motor membawa nomor urut. Aplikasi menunggu snapshot yang mengakui nomor tersebut sebelum membuat checkpoint perubahan perintah. Dengan demikian, Power OFF menyimpan posisi setelah task motor menerima hold, bukan posisi yang dibaca sebelum motor berhenti.
 
 ## Power dan mode
@@ -45,5 +47,7 @@ Flash ditulis oleh task aplikasi saat state berubah, motor selesai, atau checkpo
 Wi-Fi dicoba kembali setiap 10 detik, dan Blynk setiap lima detik dengan budget `connect(250)`. Tidak ada `delay(1000)` pada jalur reconnect aplikasi. Panggilan koneksi Blynk tetap dapat menunggu hingga timeout tersebut; task motor berjalan terpisah.
 
 Semua virtual pin dipublikasikan dari satu lokasi, paling banyak delapan nilai aplikasi per interval satu detik, termasuk reset tombol. Reconnect menghapus cache sehingga dashboard kembali menampilkan state perangkat. Nilai V0 lama di cloud tidak otomatis mengaktifkan perangkat yang sudah OFF.
+
+Callback power/mode menandai V0–V2 untuk dikirim ulang pada jadwal publikasi berikutnya, walaupun state lokal tidak berubah. Dengan demikian, perintah V1/V2 saat OFF yang ditolak controller dikoreksi menjadi nol pada dashboard. Flag koreksi tetap tertunda ketika belum tersambung atau interval satu detik belum lewat.
 
 Pin, kecepatan, percepatan, interval, dan kalibrasi dapat diubah pada `src/config/HardwareConfig.h`. Perubahan harus disertai build dan pengujian yang sesuai.

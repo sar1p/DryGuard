@@ -90,6 +90,10 @@ void BlynkGateway::receive(CommandType type, int value) {
   if (!sink_ || (value != 0 && value != 1)) return;
   if ((type == CommandType::Inside || type == CommandType::Outside) && value != 1) return;
   sink_->handleCommand(type, value);
+  // Echo the accepted device state, including mode changes rejected while OFF.
+  if (type == CommandType::Power || type == CommandType::Automatic || type == CommandType::Manual) {
+    refreshSwitches_ = true;
+  }
 }
 
 void BlynkGateway::publish(const DashboardState& state, uint32_t now) {
@@ -99,9 +103,9 @@ void BlynkGateway::publish(const DashboardState& state, uint32_t now) {
   const bool manual = state.control.enabled && state.control.mode == Mode::Manual;
   const bool oldAutomatic = cached_.control.enabled && cached_.control.mode == Mode::Automatic;
   const bool oldManual = cached_.control.enabled && cached_.control.mode == Mode::Manual;
-  if (!cacheValid_ || state.control.enabled != cached_.control.enabled) Blynk.virtualWrite(V0, state.control.enabled);
-  if (!cacheValid_ || automatic != oldAutomatic) Blynk.virtualWrite(V1, automatic);
-  if (!cacheValid_ || manual != oldManual) Blynk.virtualWrite(V2, manual);
+  if (!cacheValid_ || refreshSwitches_ || state.control.enabled != cached_.control.enabled) Blynk.virtualWrite(V0, state.control.enabled);
+  if (!cacheValid_ || refreshSwitches_ || automatic != oldAutomatic) Blynk.virtualWrite(V1, automatic);
+  if (!cacheValid_ || refreshSwitches_ || manual != oldManual) Blynk.virtualWrite(V2, manual);
   if (resetInside_) { Blynk.virtualWrite(V3, 0); resetInside_ = false; }
   if (resetOutside_) { Blynk.virtualWrite(V4, 0); resetOutside_ = false; }
   if (!cacheValid_ || strcmp(weatherText(state), weatherText(cached_)) != 0) Blynk.virtualWrite(V5, weatherText(state));
@@ -109,6 +113,7 @@ void BlynkGateway::publish(const DashboardState& state, uint32_t now) {
   if (!cacheValid_ || strcmp(positionText(state), positionText(cached_)) != 0) Blynk.virtualWrite(V7, positionText(state));
   cached_ = state;
   cacheValid_ = true;
+  refreshSwitches_ = false;
   hasPublished_ = true;
   lastPublish_ = now;
 }

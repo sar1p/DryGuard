@@ -4,7 +4,7 @@ namespace jemuran {
 
 SensorReadings SensorPolicy::update(int rainRaw, int lightRaw) {
   if (rainRaw < 0 || rainRaw > 4095 || lightRaw < 0 || lightRaw > 4095) {
-    initialized_ = false;
+    // Reject the sample without discarding the last valid alarm's clearing margin.
     return {rainRaw, lightRaw, true, true, false};
   }
 

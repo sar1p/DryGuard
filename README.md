@@ -51,8 +51,8 @@ platformio.ini             # versi platform/library yang dipatok
 1. Salin `firmware/jemuran_otomatis/src/Secrets.example.h` menjadi `Secrets.h` di folder yang sama, lalu isi template Blynk, token, SSID, dan password Wi-Fi. `Secrets.h` diabaikan Git.
 2. Siapkan dashboard sesuai tabel [virtual pin Blynk](docs/SETUP.md#dashboard-blynk).
 3. Build menggunakan PlatformIO atau buka `firmware/jemuran_otomatis/jemuran_otomatis.ino` melalui Arduino IDE. Tidak perlu mengganti ekstensi file `.cpp`.
-4. Pada **setiap boot/restart**, sistem mulai **OFF** sambil mempertahankan tujuan yang tersimpan. Cocokkan posisi fisik dengan estimasi yang ditampilkan Serial Monitor sebelum menyalakan V0.
-5. Pilih otomatis melalui V1, atau manual melalui V2/V3/V4.
+4. Pada **setiap boot/restart**, sistem mulai **OFF** sambil mempertahankan tujuan yang tersimpan. Cocokkan posisi fisik dengan estimasi yang ditampilkan Serial Monitor sebelum menyalakan V0. V0 ON langsung mengaktifkan mode tersimpan; pada boot pertama, mode bawaan adalah automatic.
+5. Setelah V0 ON, pilih otomatis melalui V1, atau manual melalui V2/V3/V4. Perintah mode saat OFF diabaikan dan switch dashboard dikembalikan ke status perangkat.
 
 Panduan lengkap: [setup dan build](docs/SETUP.md), [arsitektur](docs/ARCHITECTURE.md), [pengujian](docs/TESTING.md), dan [penelusuran restart](docs/TROUBLESHOOTING.md).
 
@@ -61,9 +61,9 @@ Panduan lengkap: [setup dan build](docs/SETUP.md), [arsitektur](docs/ARCHITECTUR
 - Objek motor diakses hanya oleh task motor; task aplikasi mengirim target/hold melalui queue dan membaca snapshot.
 - Power OFF menghentikan gerak sambil mempertahankan tujuan yang tertunda. Tujuan resume tidak ditimpa kembali oleh proses boot; setelah restart, perjalanan dilanjutkan melalui V0 ON setelah posisi diperiksa.
 - Mode automatic/manual menggunakan satu enum, sehingga keduanya tidak aktif bersamaan.
-- Pembacaan median dan hysteresis mengurangi pergantian arah akibat noise di sekitar ambang sensor.
+- Pembacaan median dan hysteresis mengurangi pergantian arah akibat noise di sekitar ambang sensor. Alarm sebelumnya tetap memakai margin pembersihan setelah sampel tidak valid.
 - Penyimpanan memakai satu record dengan schema, checksum, dan validasi rentang. Checkpoint bergerak dibuat paling cepat setiap lima detik, selain perubahan perintah/status dan akhir gerak.
-- Dashboard dikirim saat nilai berubah, dengan interval satu detik. State perangkat dipublikasikan kembali saat reconnect.
+- Dashboard dikirim saat nilai berubah, dengan interval satu detik. Switch power/mode juga dikoreksi setelah perintah diterima, termasuk perintah mode yang ditolak saat OFF. State perangkat dipublikasikan kembali saat reconnect.
 - Boot mencetak alasan reset; diagnostik heap dan sensor dicetak setiap menit.
 
 ## Batas pengujian dan posisi

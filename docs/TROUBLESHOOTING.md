@@ -26,6 +26,8 @@ Log alasan reset membantu penyelidikan, tetapi bukan pengukuran tegangan atau bu
 
 Konfigurasi pin serta kecepatan awal mengikuti proyek lama. Bila motor kehilangan langkah ketika diberi beban, uji kecepatan/percepatan lebih rendah pada `HardwareConfig.h`, periksa hambatan mekanik, dan cocokkan estimasi posisi terhadap posisi fisik. Pencacahan langkah software tidak mendeteksi stall.
 
+`kMotorMaxSpeed` adalah batas kecepatan yang dikonfigurasi. Kecepatan aktual juga bergantung pada frekuensi pemanggilan `run()` dan penjadwalan task; ukur waktu perjalanan pada perangkat sebelum menganggap nilai itu tercapai.
+
 Pastikan motor/driver memperoleh suplai 5 V sesuai spesifikasinya; motor tidak disuplai dari GPIO ESP32. ESP32 dan driver memerlukan ground bersama. Bandingkan kondisi tanpa gerak motor, gerak tanpa beban, dan beban penggunaan, lalu ukur tegangan saat gejala muncul. Mengubah kode tidak dapat memperbaiki suplai yang turun atau mekanisme yang macet.
 
 ## Dashboard tidak tersambung
