@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.ino text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+legacy/*.cpp -text
