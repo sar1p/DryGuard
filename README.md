@@ -1,6 +1,6 @@
-# Jemuran Otomatis — ESP32 dan Blynk
+# DryGuard — Jemuran Otomatis ESP32 dan Blynk
 
-Firmware jemuran otomatis dengan sensor hujan, sensor cahaya, motor stepper 5 V, dan driver ULN2003. Mode otomatis memasukkan jemuran ketika hujan atau gelap, lalu mengeluarkannya ketika kering dan terang. Mode manual menyediakan perintah masuk/keluar melalui Blynk.
+DryGuard adalah firmware jemuran otomatis dengan sensor hujan, sensor cahaya, motor stepper 5 V, dan driver ULN2003. Mode otomatis memasukkan jemuran ketika hujan atau gelap, lalu mengeluarkannya ketika kering dan terang. Mode manual menyediakan perintah masuk/keluar melalui Blynk.
 
 Versi ini memisahkan kode berdasarkan tanggung jawab, memakai antrean FreeRTOS untuk kontrol motor, menyimpan checkpoint melalui Preferences/NVS, dan menyediakan build serta pengujian otomatis. Dua sketch sebelumnya tersedia di [`legacy/`](legacy/README.md) sebagai rujukan.
 
