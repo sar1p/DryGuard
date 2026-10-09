@@ -114,13 +114,26 @@ int main() {
       rebooted.setEnabled(true);
       require(rebooted.motionRequest().target == 4000, "resume target must not be overwritten with position");
     }},
-    {"active manual travel resumes after reboot", [] {
+    {"active manual travel waits for enable after reboot", [] {
       Controller controller = runningController();
       controller.moveOutside();
       const SavedState saved = controller.checkpoint(1450);
       Controller rebooted(config::kSettings);
       rebooted.restore(saved);
+      require(!rebooted.motionRequest().move, "reboot must not start from an unverified position estimate");
+      rebooted.setEnabled(true);
       require(rebooted.motionRequest().move && rebooted.motionRequest().target == 4000, "resume must preserve full-width target");
+    }},
+    {"automatic reboot waits for enable and evaluates current weather", [] {
+      Controller controller = runningController();
+      controller.updateSensors(sunny());
+      Controller rebooted(config::kSettings);
+      rebooted.restore(controller.checkpoint(1350));
+      rebooted.updateSensors(rain());
+      require(!rebooted.motionRequest().move, "automatic reboot must hold until enabled");
+      rebooted.setEnabled(true);
+      rebooted.updateSensors(rain());
+      require(rebooted.motionRequest().target == 0, "re-enabled automatic must use current weather");
     }},
     {"automatic resume evaluates current weather", [] {
       Controller controller = runningController();

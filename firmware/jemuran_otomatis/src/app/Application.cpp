@@ -22,7 +22,8 @@ bool Application::begin() {
   lastSavedPosition_ = restored.position;
   Serial.printf("[STATE] estimate=%ld target=%ld power=%d mode=%d\n",
       static_cast<long>(restored.position), static_cast<long>(restored.target),
-      restored.enabled, static_cast<int>(restored.mode));
+      controller_.state().enabled, static_cast<int>(restored.mode));
+  Serial.println("[STATE] Startup OFF; verify physical position before V0 ON");
   sensors_.begin();
   if (!motor_.begin(restored.position)) {
     Serial.println("[FATAL] Could not start motor task/queues");

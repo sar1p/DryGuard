@@ -24,6 +24,7 @@ Setiap perintah motor membawa nomor urut. Aplikasi menunggu snapshot yang mengak
 - `Manual`: V3/V4 memilih tujuan secara eksplisit. Perintah manual mengabaikan aturan cuaca sampai mode automatic dipilih kembali.
 - `Idle`: tidak ada gerak yang diminta.
 - Power OFF terpisah dari mode. Mode dan tujuan yang tertunda dipertahankan, tetapi permintaan motor menjadi hold. Ketika power kembali ON dalam mode automatic, cuaca terkini dievaluasi terlebih dahulu.
+- Setiap boot mulai OFF, termasuk ketika record menyimpan power ON. Mode/tujuan tetap dipertahankan, tetapi V0 harus dinyalakan kembali setelah posisi fisik diperiksa. Tanpa feedback posisi, firmware tidak dapat membuktikan lokasi motor sesudah reset mendadak.
 - V0 mengaktifkan/menonaktifkan logika gerak; hold tidak memutus suplai driver atau otomatis melepas arus holding coil.
 - Memilih mode manual melalui V2 membuat motor hold. Mematikan mode yang aktif juga membuat hold.
 

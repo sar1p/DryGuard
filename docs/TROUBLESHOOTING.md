@@ -39,4 +39,4 @@ Pastikan motor/driver memperoleh suplai 5 V sesuai spesifikasinya; motor tidak d
 
 Checkpoint bergerak tidak dibuat pada setiap langkah. Pemadaman mendadak dapat menghilangkan perubahan sejak checkpoint terakhir; pergeseran mekanik saat mati dan langkah terlewat juga tidak terdeteksi. Cocokkan posisi secara fisik, lalu perbaiki kalibrasi atau tambahkan mekanisme homing pada pengembangan berikutnya.
 
-Untuk boot pertama/migrasi, baca estimasi `[STATE]` sebelum V0 ON. Namespace lama tetap tersimpan agar dapat ditelusuri, tetapi rollback firmware lama mungkin membaca checkpoint lamanya sendiri yang sudah tidak mengikuti gerak pada firmware baru.
+Pada setiap boot/restart, firmware menunggu V0 ON; baca estimasi `[STATE]` dan cocokkan dengan posisi fisik terlebih dahulu. Namespace lama tetap tersimpan agar dapat ditelusuri, tetapi rollback firmware lama mungkin membaca checkpoint lamanya sendiri yang sudah tidak mengikuti gerak pada firmware baru.

@@ -21,6 +21,9 @@ Controller::Controller(const Settings& settings)
 
 void Controller::restore(const SavedState& state) {
   state_ = validState(state, settings_) ? state : defaultState(settings_);
+  // A checkpoint estimates position; it cannot prove where an open-loop motor
+  // stopped during a reset. Keep the destination, but require V0 ON after boot.
+  state_.enabled = false;
 }
 
 void Controller::updateSensors(const SensorReadings& sensors) {

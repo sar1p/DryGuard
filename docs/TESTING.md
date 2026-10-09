@@ -8,7 +8,7 @@ python tools/run_tests.py
 
 Runner membutuhkan GCC atau Clang pada PATH. Bila compiler berada di lokasi lain, atur `CXX` ke path executable compiler. Tes mengompilasi **kode C++ yang sama dengan firmware**, bukan implementasi ulang dalam Python.
 
-Tes mencakup startup OFF, cuaca otomatis, hysteresis, ADC di luar rentang, pergantian mode, override manual, penolakan perintah saat OFF, pause/resume saat reboot, target penuh `4000`, checkpoint posisi hold, record korup, dan debounce saat `millis()` melingkar.
+Tes mencakup startup/restart OFF, cuaca otomatis, hysteresis, ADC di luar rentang, pergantian mode, override manual, penolakan perintah saat OFF, pause/resume setelah enable, target penuh `4000`, checkpoint posisi hold, record korup, dan debounce saat `millis()` melingkar.
 
 GitHub Actions menjalankan dua pemeriksaan:
 
@@ -33,7 +33,7 @@ Seluruh baris berikut memerlukan pengujian fisik; jangan menandainya lulus hanya
 | Mode manual dan V3/V4 | Mode benar, tombol kembali nol, arah sesuai wiring |
 | V0 OFF di tengah gerak | Gerak berhenti, posisi disimpan setelah hold diakui |
 | V0 ON setelah pause manual | Tujuan sebelumnya dilanjutkan, estimasi cocok dengan posisi nyata |
-| Reboot di tengah gerak | Checkpoint dibaca; ukur selisih estimasi terhadap posisi fisik |
+| Reboot di tengah gerak | Checkpoint dibaca dan sistem OFF; ukur selisih estimasi terhadap posisi fisik sebelum V0 ON |
 | Wi-Fi/Blynk terputus lalu tersambung | Logika lokal tetap berjalan, dashboard diperbarui saat reconnect |
 | Beban ringan hingga beban penggunaan | Catat reset reason, suplai, suhu driver/motor, dan langkah terlewat |
 
